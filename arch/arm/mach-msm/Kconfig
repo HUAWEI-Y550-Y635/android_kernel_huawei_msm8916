@@ -116,6 +116,7 @@ config ARCH_MSM8916
 	select MSM_RPM_LOG
 	select MSM_JTAGV8 if CORESIGHT_ETMV4
 	select RCU_BOOST if DEBUG_KMEMLEAK
+	select HAS_MACH_MEMUTILS
 
 config ARCH_FSM9900
 	bool "FSM9900"
@@ -968,6 +969,12 @@ config MSM_PP2S_FEMTO
 	  Support for being notified relative to a PP2S pulse
 	  Select Y if you want this notification to manifest.
 	  If unsure, select N.
+
+config HAS_MACH_MEMUTILS
+	default n
+	bool "Motorola MSM memcpy enhancements"
+	help
+	Faster memcpy performance for Krait
 
 config HUAWEI_KERNEL
 	bool "Use huawei code"
