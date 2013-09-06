@@ -146,6 +146,7 @@ struct restart_log {
  * @do_ramdump_on_put: ramdump on subsystem_put() if true
  * @err_ready: completion variable to record error ready from subsystem
  * @crashed: indicates if subsystem has crashed
+ * @notif_state: current state of subsystem in terms of subsys notifications
  */
 struct subsys_device {
 	struct subsys_desc *desc;
@@ -171,6 +172,7 @@ struct subsys_device {
 	dev_t dev_no;
 	struct completion err_ready;
 	bool crashed;
+	int notif_state;
 	struct list_head list;
 };
 
@@ -381,12 +383,16 @@ out:
 	mutex_unlock(&restart_log_mutex);
 }
 
-static int is_ramdump_enabled(struct subsys_device *dev)
+static void send_sysmon_notif(struct subsys_device *dev)
 {
-	if (dev->desc->ramdump_disable_gpio)
-		return !dev->desc->ramdump_disable;
+	struct subsys_device *subsys;
 
-	return enable_ramdumps;
+	mutex_lock(&subsys_list_lock);
+	list_for_each_entry(subsys, &subsys_list, list)
+		if ((subsys->notif_state > 0) && (subsys != dev))
+			sysmon_send_event(dev->desc->name, subsys->desc->name,
+						subsys->notif_state);
+	mutex_unlock(&subsys_list_lock);
 }
 
 static void for_each_subsys_device(struct subsys_device **list, unsigned count,
@@ -416,6 +422,8 @@ static void notify_each_subsys_device(struct subsys_device **list,
 
 		pdev = container_of(dev->desc->dev, struct platform_device,
 									dev);
+		dev->notif_state = notif;
+
 		mutex_lock(&subsys_list_lock);
 		list_for_each_entry(subsys, &subsys_list, list)
 			if (dev != subsys)
@@ -424,8 +432,11 @@ static void notify_each_subsys_device(struct subsys_device **list,
 						notif);
 		mutex_unlock(&subsys_list_lock);
 
+		if (notif == SUBSYS_AFTER_POWERUP)
+			send_sysmon_notif(dev);
+
 		notif_data.crashed = subsys_get_crash_status(dev);
-		notif_data.enable_ramdump = is_ramdump_enabled(dev);
+		notif_data.enable_ramdump = enable_ramdumps;
 		notif_data.no_auth = dev->desc->no_auth;
 		notif_data.pdev = pdev;
 
@@ -497,7 +508,7 @@ static void subsystem_ramdump(struct subsys_device *dev, void *data)
 	const char *name = dev->desc->name;
 
 	if (dev->desc->ramdump)
-		if (dev->desc->ramdump(is_ramdump_enabled(dev), dev->desc) < 0)
+		if (dev->desc->ramdump(enable_ramdumps, dev->desc) < 0)
 			pr_warn("%s[%p]: Ramdump failed.\n", name, current);
 	dev->do_ramdump_on_put = false;
 }
@@ -759,6 +770,7 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 
 	notify_each_subsys_device(list, count, SUBSYS_RAMDUMP_NOTIFICATION,
 							  NULL);
+
 	spin_lock_irqsave(&track->s_lock, flags);
 	track->p_state = SUBSYS_RESTARTING;
 	spin_unlock_irqrestore(&track->s_lock, flags);
@@ -1307,11 +1319,6 @@ static int subsys_parse_devicetree(struct subsys_desc *desc)
 	if (ret && ret != -ENOENT)
 		return ret;
 
-	ret = __get_gpio(desc, "qcom,gpio-ramdump-disable",
-			&desc->ramdump_disable_gpio);
-	if (ret && ret != -ENOENT)
-		return ret;
-
 	ret = platform_get_irq(pdev, 0);
 	if (ret > 0)
 		desc->wdog_bite_irq = ret;
@@ -1399,6 +1406,7 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 	subsys->dev.parent = desc->dev;
 	subsys->dev.bus = &subsys_bus_type;
 	subsys->dev.release = subsys_device_release;
+	subsys->notif_state = -1;
 
 	subsys->notify = subsys_notif_add_subsys(desc->name);
 
