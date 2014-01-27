@@ -30,6 +30,7 @@
 #define A_REG(pll) (*pll->base + pll->offset + 0x8)
 #define VCO_REG(pll) (*pll->base + pll->offset + 0x10)
 #define ALPHA_EN_REG(pll) (*pll->base + pll->offset + 0x10)
+#define OUTPUT_REG(pll) (*pll->base + pll->offset + 0x10)
 
 #define PLL_BYPASSNL 0x2
 #define PLL_RESET_N  0x4
@@ -284,11 +285,21 @@ static enum handoff alpha_pll_handoff(struct clk *c)
 	struct alpha_pll_masks *masks = pll->masks;
 	u64 parent_rate, a_val;
 	u32 alpha_en, l_val;
+	u32 output_en;
 
 	update_vco_tbl(pll);
 
-	if (!is_locked(pll))
+	if (!is_locked(pll)) {
+		if (c->rate && alpha_pll_set_rate(c, c->rate))
+			WARN(1, "%s: Failed to configure rate\n", c->dbg_name);
+		if (masks->output_mask && pll->enable_config) {
+			output_en = readl_relaxed(OUTPUT_REG(pll));
+			output_en &= ~masks->output_mask;
+			output_en |= pll->enable_config;
+			writel_relaxed(output_en, OUTPUT_REG(pll));
+		}
 		return HANDOFF_DISABLED_CLK;
+	}
 
 	alpha_en = readl_relaxed(ALPHA_EN_REG(pll));
 	alpha_en &= masks->alpha_en_mask;
