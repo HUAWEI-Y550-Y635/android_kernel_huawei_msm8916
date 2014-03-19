@@ -1502,6 +1502,31 @@ int msm_isp_set_src_state(struct vfe_device *vfe_dev, void *arg)
 	return 0;
 }
 
+static int msm_vfe_iommu_fault_handler(struct iommu_domain *domain,
+	struct device *dev, unsigned long iova, int flags, void *token)
+{
+	struct vfe_device *vfe_dev = NULL;
+	if (token) {
+		vfe_dev = (struct vfe_device *)token;
+		if (!vfe_dev->buf_mgr || !vfe_dev->buf_mgr->ops) {
+			pr_err("%s:%d] buf_mgr %p\n", __func__,
+				__LINE__, vfe_dev->buf_mgr);
+			goto end;
+		}
+		if (!vfe_dev->buf_mgr->pagefault_debug) {
+			pr_err("%s:%d] vfe_dev %p id %d\n", __func__,
+				__LINE__, vfe_dev, vfe_dev->pdev->id);
+			vfe_dev->buf_mgr->ops->buf_mgr_debug(vfe_dev->buf_mgr);
+		}
+	} else {
+		ISP_DBG("%s:%d] no token received: %p\n",
+			__func__, __LINE__, token);
+		goto end;
+	}
+end:
+	return -ENOSYS;
+}
+
 int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct vfe_device *vfe_dev = v4l2_get_subdevdata(sd);
@@ -1540,7 +1565,8 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 
 	vfe_dev->hw_info->vfe_ops.core_ops.init_hw_reg(vfe_dev);
 
-	vfe_dev->buf_mgr->ops->buf_mgr_init(vfe_dev->buf_mgr, "msm_isp", 28);
+	vfe_dev->buf_mgr->ops->buf_mgr_init(vfe_dev->buf_mgr,
+		"msm_isp", BUF_MGR_NUM_BUF_Q);
 
 	memset(&vfe_dev->axi_data, 0, sizeof(struct msm_vfe_axi_shared_data));
 	memset(&vfe_dev->stats_data, 0,
@@ -1553,6 +1579,9 @@ int msm_isp_open_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 	vfe_dev->p_avtimer_msw = NULL;
 	vfe_dev->p_avtimer_ctl = NULL;
 	vfe_dev->avtimer_scaler = 1; /*No scaling*/
+	iommu_set_fault_handler(vfe_dev->buf_mgr->iommu_domain,
+		msm_vfe_iommu_fault_handler, vfe_dev);
+
 	mutex_unlock(&vfe_dev->core_mutex);
 	mutex_unlock(&vfe_dev->realtime_mutex);
 	return 0;
