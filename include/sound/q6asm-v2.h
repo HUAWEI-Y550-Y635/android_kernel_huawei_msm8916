@@ -253,8 +253,6 @@ int q6asm_memory_map(struct audio_client *ac, phys_addr_t buf_add,
 int q6asm_memory_unmap(struct audio_client *ac, phys_addr_t buf_add,
 							int dir);
 
-int q6asm_unmap_cal_blocks(void);
-
 int q6asm_map_rtac_block(struct rtac_cal_block_data *cal_block);
 
 int q6asm_unmap_rtac_block(uint32_t *mem_map_handle);
@@ -432,5 +430,8 @@ int q6asm_stream_send_meta_data(struct audio_client *ac, uint32_t stream_id,
 int q6asm_send_mtmx_strtr_window(struct audio_client *ac,
 		struct asm_session_mtmx_strtr_param_window_v2_t *window_param,
 		uint32_t param_id);
+
+/* Get current ASM topology */
+int q6asm_get_asm_topology(void);
 
 #endif /* __Q6_ASM_H__ */
