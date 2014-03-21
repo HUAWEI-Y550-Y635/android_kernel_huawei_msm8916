@@ -37,13 +37,17 @@
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/scm.h>
 #include <soc/qcom/socinfo.h>
-#include <mach/board.h>
 #include <linux/msm-bus.h>
 #include <linux/msm-bus-board.h>
 #include <soc/qcom/qseecomi.h>
 #include <asm/cacheflush.h>
 #include "qseecom_legacy.h"
 #include "qseecom_kernel.h"
+
+#ifdef CONFIG_COMPAT
+#include <linux/compat.h>
+#include <linux/compat_qseecom.h>
+#endif
 
 #define QSEECOM_DEV			"qseecom"
 #define QSEOS_VERSION_14		0x14
@@ -102,9 +106,9 @@ static DEFINE_MUTEX(clk_access_lock);
 struct qseecom_registered_listener_list {
 	struct list_head                 list;
 	struct qseecom_register_listener_req svc;
-	uint32_t user_virt_sb_base;
+	void  *user_virt_sb_base;
 	u8 *sb_virt;
-	s32 sb_phys;
+	phys_addr_t sb_phys;
 	size_t sb_length;
 	struct ion_handle *ihandle; /* Retrieve phy addr */
 
@@ -181,8 +185,8 @@ struct qseecom_control {
 struct qseecom_client_handle {
 	u32  app_id;
 	u8 *sb_virt;
-	s32 sb_phys;
-	uint32_t user_virt_sb_base;
+	phys_addr_t sb_phys;
+	unsigned long user_virt_sb_base;
 	size_t sb_length;
 	struct ion_handle *ihandle;		/* Retrieve phy addr */
 };
@@ -209,7 +213,7 @@ struct qseecom_dev_handle {
 };
 
 struct qseecom_sg_entry {
-	uint32_t phys_addr;
+	phys_addr_t phys_addr;
 	uint32_t len;
 };
 
@@ -305,12 +309,12 @@ static int __qseecom_set_sb_memory(struct qseecom_registered_listener_list *svc,
 	}
 	/* Populate the structure for sending scm call to load image */
 	svc->sb_virt = (char *) ion_map_kernel(qseecom.ion_clnt, svc->ihandle);
-	svc->sb_phys = pa;
+	svc->sb_phys = (phys_addr_t)pa;
 
 	req.qsee_cmd_id = QSEOS_REGISTER_LISTENER;
 	req.listener_id = svc->svc.listener_id;
 	req.sb_len = svc->sb_length;
-	req.sb_ptr = (void *)svc->sb_phys;
+	req.sb_ptr = (uint32_t)svc->sb_phys;/* convert to 32bit addr for tz */
 
 	resp.result = QSEOS_RESULT_INCOMPLETE;
 
@@ -601,25 +605,6 @@ static int __qseecom_register_bus_bandwidth_needs(
 	return ret;
 }
 
-static int qseecom_perf_enable(struct qseecom_dev_handle *data)
-{
-	int ret = 0;
-	ret = qsee_vote_for_clock(data, CLK_DFAB);
-	if (ret) {
-		pr_err("Failed to vote for DFAB clock with err %d\n", ret);
-		goto perf_enable_exit;
-	}
-	ret = qsee_vote_for_clock(data, CLK_SFPB);
-	if (ret) {
-		qsee_disable_clock_vote(data, CLK_DFAB);
-		pr_err("Failed to vote for SFPB clock with err %d\n", ret);
-		goto perf_enable_exit;
-	}
-
-perf_enable_exit:
-	return ret;
-}
-
 static int qseecom_scale_bus_bandwidth(struct qseecom_dev_handle *data,
 						void __user *argp)
 {
@@ -635,29 +620,10 @@ static int qseecom_scale_bus_bandwidth(struct qseecom_dev_handle *data,
 		pr_err("Invalid bandwidth mode (%d)\n", req_mode);
 		return ret;
 	}
+	mutex_lock(&qsee_bw_mutex);
+	ret = __qseecom_register_bus_bandwidth_needs(data, req_mode);
+	mutex_unlock(&qsee_bw_mutex);
 
-	/*
-	* Register bus bandwidth needs if bus scaling feature is enabled;
-	* otherwise, qseecom enable/disable clocks for the client directly.
-	*/
-	if (qseecom.support_bus_scaling) {
-		mutex_lock(&qsee_bw_mutex);
-		ret = __qseecom_register_bus_bandwidth_needs(data, req_mode);
-		mutex_unlock(&qsee_bw_mutex);
-	} else {
-		pr_debug("Bus scaling feature is NOT enabled\n");
-		pr_debug("request bandwidth mode %d for the client\n",
-				req_mode);
-		if (req_mode != INACTIVE) {
-			ret = qseecom_perf_enable(data);
-			if (ret)
-				pr_err("Failed to vote for clock with err %d\n",
-						ret);
-		} else {
-			qsee_disable_clock_vote(data, CLK_DFAB);
-			qsee_disable_clock_vote(data, CLK_SFPB);
-		}
-	}
 	return ret;
 }
 
@@ -703,15 +669,15 @@ static int qseecom_set_client_mem_param(struct qseecom_dev_handle *data,
 	ion_phys_addr_t pa;
 	int32_t ret;
 	struct qseecom_set_sb_mem_param_req req;
-	uint32_t len;
+	size_t len;
 
 	/* Copy the relevant information needed for loading the image */
 	if (copy_from_user(&req, (void __user *)argp, sizeof(req)))
 		return -EFAULT;
 
-	if ((req.ifd_data_fd <= 0) || (req.virt_sb_base == 0) ||
+	if ((req.ifd_data_fd <= 0) || (req.virt_sb_base == NULL) ||
 					(req.sb_len == 0)) {
-		pr_err("Inavlid input(s)ion_fd(%d), sb_len(%d), vaddr(0x%x)\n",
+		pr_err("Inavlid input(s)ion_fd(%d), sb_len(%d), vaddr(0x%p)\n",
 			req.ifd_data_fd, req.sb_len, req.virt_sb_base);
 		return -EFAULT;
 	}
@@ -736,16 +702,16 @@ static int qseecom_set_client_mem_param(struct qseecom_dev_handle *data,
 	}
 
 	if (len < req.sb_len) {
-		pr_err("Requested length (0x%x) is > allocated (0x%x)\n",
+		pr_err("Requested length (0x%x) is > allocated (0x%zu)\n",
 			req.sb_len, len);
 		return -EINVAL;
 	}
 	/* Populate the structure for sending scm call to load image */
 	data->client.sb_virt = (char *) ion_map_kernel(qseecom.ion_clnt,
 							data->client.ihandle);
-	data->client.sb_phys = pa;
+	data->client.sb_phys = (phys_addr_t)pa;
 	data->client.sb_length = req.sb_len;
-	data->client.user_virt_sb_base = req.virt_sb_base;
+	data->client.user_virt_sb_base = (uintptr_t)req.virt_sb_base;
 	return 0;
 }
 
@@ -790,12 +756,6 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 			pr_err("Listener Svc %d does not exist\n", lstnr);
 			return -EINVAL;
 		}
-
-		if (!ptr_svc->ihandle) {
-			pr_err("Client handle is not initialized\n");
-			return -EINVAL;
-		}
-
 		if (ptr_svc->svc.listener_id != lstnr) {
 			pr_warning("Service requested for does on exist\n");
 			return -ERESTARTSYS;
@@ -868,6 +828,7 @@ static int __qseecom_check_app_exists(struct qseecom_check_app_ireq req)
 	int32_t ret;
 	struct qseecom_command_scm_resp resp;
 
+	memset((void *)&resp, 0, sizeof(resp));
 	/*  SCM_CALL  to check if app_id for the mentioned app exists */
 	ret = scm_call(SCM_SVC_TZSCHEDULER, 1,  &req,
 				sizeof(struct qseecom_check_app_ireq),
@@ -906,7 +867,7 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 	struct qseecom_load_img_req load_img_req;
 	int32_t ret = 0;
 	ion_phys_addr_t pa = 0;
-	uint32_t len;
+	size_t len;
 	struct qseecom_command_scm_resp resp;
 	struct qseecom_check_app_ireq req;
 	struct qseecom_load_app_ireq load_req;
@@ -980,7 +941,7 @@ static int qseecom_load_app(struct qseecom_dev_handle *data, void __user *argp)
 		load_req.qsee_cmd_id = QSEOS_APP_START_COMMAND;
 		load_req.mdt_len = load_img_req.mdt_len;
 		load_req.img_len = load_img_req.img_len;
-		load_req.phy_addr = pa;
+		load_req.phy_addr = (uint32_t)pa;
 		msm_ion_do_cache_op(qseecom.ion_clnt, ihandle, NULL, len,
 					ION_IOC_CLEAN_INV_CACHES);
 
@@ -1166,16 +1127,16 @@ static int qseecom_unload_app(struct qseecom_dev_handle *data)
 	return ret;
 }
 
-static uint32_t __qseecom_uvirt_to_kphys(struct qseecom_dev_handle *data,
-						uint32_t virt)
+static phys_addr_t __qseecom_uvirt_to_kphys(struct qseecom_dev_handle *data,
+						unsigned long virt)
 {
 	return data->client.sb_phys + (virt - data->client.user_virt_sb_base);
 }
 
-static uint32_t __qseecom_uvirt_to_kvirt(struct qseecom_dev_handle *data,
-						uint32_t virt)
+static uintptr_t __qseecom_uvirt_to_kvirt(struct qseecom_dev_handle *data,
+						unsigned long virt)
 {
-	return (uint32_t)data->client.sb_virt +
+	return (uintptr_t)data->client.sb_virt +
 				(virt - data->client.user_virt_sb_base);
 }
 
@@ -1198,14 +1159,15 @@ int __qseecom_process_rpmb_svc_cmd(struct qseecom_dev_handle *data_ptr,
 	}
 
 	/* Clients need to ensure req_buf is at base offset of shared buffer */
-	if ((uint32_t)req_ptr->cmd_req_buf !=
+	if ((uintptr_t)req_ptr->cmd_req_buf !=
 			data_ptr->client.user_virt_sb_base) {
 		pr_err("cmd buf not pointing to base offset of shared buffer\n");
 		return -EINVAL;
 	}
 
-	if (((uint32_t)req_ptr->resp_buf < data_ptr->client.user_virt_sb_base)
-			|| ((uint32_t)req_ptr->resp_buf >=
+	if (((uintptr_t)req_ptr->resp_buf <
+			data_ptr->client.user_virt_sb_base) ||
+		((uintptr_t)req_ptr->resp_buf >=
 			(data_ptr->client.user_virt_sb_base +
 			data_ptr->client.sb_length))){
 		pr_err("response buffer address not within shared bufffer\n");
@@ -1218,8 +1180,8 @@ int __qseecom_process_rpmb_svc_cmd(struct qseecom_dev_handle *data_ptr,
 	send_svc_ireq_ptr->key_type =
 		((struct qseecom_rpmb_provision_key *)req_buf)->key_type;
 	send_svc_ireq_ptr->req_len = req_ptr->cmd_req_len;
-	send_svc_ireq_ptr->rsp_ptr = (void *)(__qseecom_uvirt_to_kphys(data_ptr,
-					(uint32_t)req_ptr->resp_buf));
+	send_svc_ireq_ptr->rsp_ptr = (uint32_t)(__qseecom_uvirt_to_kphys(
+			data_ptr, (uintptr_t)req_ptr->resp_buf));
 	send_svc_ireq_ptr->rsp_len = req_ptr->resp_len;
 
 	return ret;
@@ -1238,17 +1200,18 @@ int __qseecom_process_fsm_key_svc_cmd(struct qseecom_dev_handle *data_ptr,
 		return -EINVAL;
 	}
 
-	if (((uint32_t)req_ptr->cmd_req_buf <
-			data_ptr->client.user_virt_sb_base)
-			|| ((uint32_t)req_ptr->cmd_req_buf >=
+	if (((uintptr_t)req_ptr->cmd_req_buf <
+			data_ptr->client.user_virt_sb_base) ||
+		((uintptr_t)req_ptr->cmd_req_buf >=
 			(data_ptr->client.user_virt_sb_base +
 			data_ptr->client.sb_length))) {
 		pr_err("cmd buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
 
-	if (((uint32_t)req_ptr->resp_buf < data_ptr->client.user_virt_sb_base)
-			|| ((uint32_t)req_ptr->resp_buf >=
+	if (((uintptr_t)req_ptr->resp_buf <
+			data_ptr->client.user_virt_sb_base) ||
+		((uintptr_t)req_ptr->resp_buf >=
 			(data_ptr->client.user_virt_sb_base +
 			data_ptr->client.sb_length))){
 		pr_err("response buffer address not within shared bufffer\n");
@@ -1270,19 +1233,19 @@ int __qseecom_process_fsm_key_svc_cmd(struct qseecom_dev_handle *data_ptr,
 	reqd_len_sb_in = req_ptr->cmd_req_len + req_ptr->resp_len;
 	if (reqd_len_sb_in > data_ptr->client.sb_length) {
 		pr_debug("Not enough memory to fit cmd_buf and resp_buf. ");
-		pr_debug("Required: %u, Available: %u\n",
+		pr_debug("Required: %u, Available: %zu\n",
 				reqd_len_sb_in, data_ptr->client.sb_length);
 		return -ENOMEM;
 	}
 
 	send_svc_ireq_ptr->qsee_cmd_id = req_ptr->cmd_id;
 	send_svc_ireq_ptr->req_len = req_ptr->cmd_req_len;
-	send_svc_ireq_ptr->rsp_ptr = (void *)(__qseecom_uvirt_to_kphys(data_ptr,
-					(uint32_t)req_ptr->resp_buf));
+	send_svc_ireq_ptr->rsp_ptr = (uint32_t)(__qseecom_uvirt_to_kphys(
+			data_ptr, (uintptr_t)req_ptr->resp_buf));
 	send_svc_ireq_ptr->rsp_len = req_ptr->resp_len;
 
-	send_svc_ireq_ptr->req_ptr = (void *)(__qseecom_uvirt_to_kphys(data_ptr,
-					(uint32_t)req_ptr->cmd_req_buf));
+	send_svc_ireq_ptr->req_ptr = (uint32_t)(__qseecom_uvirt_to_kphys(
+			data_ptr, (uintptr_t)req_ptr->cmd_req_buf));
 
 
 	return ret;
@@ -1310,11 +1273,6 @@ static int qseecom_send_service_cmd(struct qseecom_dev_handle *data,
 
 	if ((req.resp_buf == NULL) || (req.cmd_req_buf == NULL)) {
 		pr_err("cmd buffer or response buffer is null\n");
-		return -EINVAL;
-	}
-
-	if (!data || !data->client.ihandle) {
-		pr_err("Client or client handle is not initialized\n");
 		return -EINVAL;
 	}
 
@@ -1373,9 +1331,15 @@ static int qseecom_send_service_cmd(struct qseecom_dev_handle *data,
 			return ret;
 		}
 	} else {
-		ret = qseecom_perf_enable(data);
+		ret = qsee_vote_for_clock(data, CLK_DFAB);
 		if (ret) {
-			pr_err("Failed to vote for clocks with err %d\n", ret);
+			pr_err("Failed to vote for DFAB clock%d\n", ret);
+			return ret;
+		}
+		ret = qsee_vote_for_clock(data, CLK_SFPB);
+		if (ret) {
+			qsee_disable_clock_vote(data, CLK_DFAB);
+			pr_err("Failed to vote for SFPB clock%d\n", ret);
 			goto exit;
 		}
 	}
@@ -1445,17 +1409,19 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 		pr_err("cmd buffer or response buffer is null\n");
 		return -EINVAL;
 	}
-	if (((uint32_t)req->cmd_req_buf < data->client.user_virt_sb_base) ||
-		((uint32_t)req->cmd_req_buf >= (data->client.user_virt_sb_base +
-					data->client.sb_length))) {
+	if (((uintptr_t)req->cmd_req_buf <
+				data->client.user_virt_sb_base) ||
+		((uintptr_t)req->cmd_req_buf >=
+		(data->client.user_virt_sb_base + data->client.sb_length))) {
 		pr_err("cmd buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
 
 
-	if (((uint32_t)req->resp_buf < data->client.user_virt_sb_base)  ||
-		((uint32_t)req->resp_buf >= (data->client.user_virt_sb_base +
-					data->client.sb_length))){
+	if (((uintptr_t)req->resp_buf <
+				data->client.user_virt_sb_base)  ||
+		((uintptr_t)req->resp_buf >=
+		(data->client.user_virt_sb_base + data->client.sb_length))) {
 		pr_err("response buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
@@ -1475,24 +1441,19 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 
 	reqd_len_sb_in = req->cmd_req_len + req->resp_len;
 	if (reqd_len_sb_in > data->client.sb_length) {
-		pr_debug("Not enough memory to fit cmd_buf and "
-			"resp_buf. Required: %u, Available: %u\n",
+		pr_debug("Not enough memory to fit cmd_buf.\n");
+		pr_debug("resp_buf. Required: %u, Available: %zu\n",
 				reqd_len_sb_in, data->client.sb_length);
 		return -ENOMEM;
 	}
 
-	if (!data || !data->client.ihandle) {
-		pr_err("Client or client handle is not initialized\n");
-		return -EINVAL;
-	}
-
 	send_data_req.qsee_cmd_id = QSEOS_CLIENT_SEND_DATA_COMMAND;
 	send_data_req.app_id = data->client.app_id;
-	send_data_req.req_ptr = (void *)(__qseecom_uvirt_to_kphys(data,
-					(uint32_t)req->cmd_req_buf));
+	send_data_req.req_ptr = (uint32_t)(__qseecom_uvirt_to_kphys(data,
+					(uintptr_t)req->cmd_req_buf));
 	send_data_req.req_len = req->cmd_req_len;
-	send_data_req.rsp_ptr = (void *)(__qseecom_uvirt_to_kphys(data,
-					(uint32_t)req->resp_buf));
+	send_data_req.rsp_ptr = (uint32_t)(__qseecom_uvirt_to_kphys(data,
+					(uintptr_t)req->resp_buf));
 	send_data_req.rsp_len = req->resp_len;
 
 	msm_ion_do_cache_op(qseecom.ion_clnt, data->client.ihandle,
@@ -1686,16 +1647,18 @@ static int qseecom_send_modfd_cmd(struct qseecom_dev_handle *data,
 		pr_err("cmd buffer or response buffer is null\n");
 		return -EINVAL;
 	}
-	if (((uint32_t)req.cmd_req_buf < data->client.user_virt_sb_base) ||
-		((uint32_t)req.cmd_req_buf >= (data->client.user_virt_sb_base +
-					data->client.sb_length))) {
+	if (((uintptr_t)req.cmd_req_buf <
+				data->client.user_virt_sb_base) ||
+		((uintptr_t)req.cmd_req_buf >=
+		(data->client.user_virt_sb_base + data->client.sb_length))) {
 		pr_err("cmd buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
 
-	if (((uint32_t)req.resp_buf < data->client.user_virt_sb_base)  ||
-		((uint32_t)req.resp_buf >= (data->client.user_virt_sb_base +
-					data->client.sb_length))){
+	if (((uintptr_t)req.resp_buf <
+			data->client.user_virt_sb_base)  ||
+		((uintptr_t)req.resp_buf >=
+		(data->client.user_virt_sb_base + data->client.sb_length))) {
 		pr_err("response buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
@@ -1720,9 +1683,9 @@ static int qseecom_send_modfd_cmd(struct qseecom_dev_handle *data,
 		}
 	}
 	req.cmd_req_buf = (void *)__qseecom_uvirt_to_kvirt(data,
-						(uint32_t)req.cmd_req_buf);
+						(uintptr_t)req.cmd_req_buf);
 	req.resp_buf = (void *)__qseecom_uvirt_to_kvirt(data,
-						(uint32_t)req.resp_buf);
+						(uintptr_t)req.resp_buf);
 
 	ret = __qseecom_update_cmd_buf(&req, false, data, false);
 	if (ret)
@@ -1886,7 +1849,6 @@ static int __qseecom_get_fw_data(char *appname, u8 *img_data,
 		load_req->img_len += fw_entry->size;
 		release_firmware(fw_entry);
 	}
-	load_req->phy_addr = virt_to_phys(img_data);
 	return ret;
 err:
 	release_firmware(fw_entry);
@@ -1969,7 +1931,7 @@ static int __qseecom_load_fw(struct qseecom_dev_handle *data, char *appname)
 		goto exit_free_img_data;
 	}
 
-	/* Populate the remaining parameters */
+	/* Populate the load_req parameters */
 	load_req.phy_addr = (uint32_t)pa;
 	load_req.qsee_cmd_id = QSEOS_APP_START_COMMAND;
 	memcpy(load_req.app_name, appname, MAX_APP_NAME_SIZE);
@@ -1990,7 +1952,9 @@ static int __qseecom_load_fw(struct qseecom_dev_handle *data, char *appname)
 		goto exit_unregister_bus_bw_need;
 	}
 
-	__cpuc_flush_dcache_area((void *)img_data, fw_size);
+	msm_ion_do_cache_op(qseecom.ion_clnt, ihandle,
+				img_data, fw_size,
+				ION_IOC_CLEAN_INV_CACHES);
 
 	/* SCM_CALL to load the image */
 	ret = scm_call(SCM_SVC_TZSCHEDULER, 1,	&load_req,
@@ -2080,7 +2044,10 @@ static int qseecom_load_commonlib_image(struct qseecom_dev_handle *data)
 		goto exit_unregister_bus_bw_need;
 	}
 
-	__cpuc_flush_dcache_area((void *)img_data, fw_size);
+	msm_ion_do_cache_op(qseecom.ion_clnt, qseecom.cmnlib_ion_handle,
+				img_data, fw_size,
+				ION_IOC_CLEAN_INV_CACHES);
+
 	/* SCM_CALL to load the image */
 	ret = scm_call(SCM_SVC_TZSCHEDULER, 1, &load_req,
 				sizeof(struct qseecom_load_lib_image_ireq),
@@ -2177,7 +2144,7 @@ int qseecom_start_app(struct qseecom_handle **handle,
 	struct qseecom_registered_app_list *entry = NULL;
 	struct qseecom_registered_kclient_list *kclient_entry = NULL;
 	bool found_app = false;
-	uint32_t len;
+	size_t len;
 	ion_phys_addr_t pa;
 
 	*handle = kzalloc(sizeof(struct qseecom_handle), GFP_KERNEL);
@@ -2288,8 +2255,8 @@ int qseecom_start_app(struct qseecom_handle **handle,
 	/* Populate the structure for sending scm call to load image */
 	data->client.sb_virt = (char *) ion_map_kernel(qseecom.ion_clnt,
 							data->client.ihandle);
-	data->client.user_virt_sb_base = (uint32_t)data->client.sb_virt;
-	data->client.sb_phys = pa;
+	data->client.user_virt_sb_base = (uintptr_t)data->client.sb_virt;
+	data->client.sb_phys = (phys_addr_t)pa;
 	(*handle)->dev = (void *)data;
 	(*handle)->sbuf = (unsigned char *)data->client.sb_virt;
 	(*handle)->sbuf_len = data->client.sb_length;
@@ -2381,7 +2348,6 @@ int qseecom_send_command(struct qseecom_handle *handle, void *send_buf,
 	int ret = 0;
 	struct qseecom_send_cmd_req req = {0, 0, 0, 0};
 	struct qseecom_dev_handle *data;
-	bool perf_enabled = false;
 
 	if (handle == NULL) {
 		pr_err("Handle is not initialized\n");
@@ -2405,34 +2371,10 @@ int qseecom_send_command(struct qseecom_handle *handle, void *send_buf,
 			return ret;
 		}
 	}
-	/*
-	* On targets where crypto clock is handled by HLOS,
-	* if clk_access_cnt is zero and perf_enabled is false,
-	* then the crypto clock was not enabled before sending cmd
-	* to tz, qseecom will enable the clock to avoid service failure.
-	*/
-	if (!qseecom.qsee.clk_access_cnt && !data->perf_enabled) {
-		pr_debug("ce clock is not enabled!\n");
-		ret = qseecom_perf_enable(data);
-		if (ret) {
-			pr_err("Failed to vote for clock with err %d\n",
-						ret);
-			atomic_dec(&data->ioctl_count);
-			mutex_unlock(&app_access_lock);
-			return -EINVAL;
-		}
-		perf_enabled = true;
-	}
-
 	ret = __qseecom_send_cmd(data, &req);
 	if (qseecom.support_bus_scaling)
 		__qseecom_add_bw_scale_down_timer(
 			QSEECOM_SEND_CMD_CRYPTO_TIMEOUT);
-
-	if (perf_enabled) {
-		qsee_disable_clock_vote(data, CLK_DFAB);
-		qsee_disable_clock_vote(data, CLK_SFPB);
-	}
 
 	atomic_dec(&data->ioctl_count);
 	mutex_unlock(&app_access_lock);
@@ -2462,10 +2404,16 @@ int qseecom_set_bandwidth(struct qseecom_handle *handle, bool high)
 			if (ret)
 				pr_err("Failed to scale bus (med) %d\n", ret);
 		} else {
-			ret = qseecom_perf_enable(handle->dev);
+			ret = qsee_vote_for_clock(handle->dev, CLK_DFAB);
 			if (ret)
-				pr_err("Failed to vote for clock with err %d\n",
-						ret);
+				pr_err("Failed to vote for DFAB clock%d\n",
+									ret);
+			ret = qsee_vote_for_clock(handle->dev, CLK_SFPB);
+			if (ret) {
+				pr_err("Failed to vote for SFPB clock%d\n",
+									ret);
+				qsee_disable_clock_vote(handle->dev, CLK_DFAB);
+			}
 		}
 	} else {
 		if (!qseecom.support_bus_scaling) {
@@ -2517,16 +2465,15 @@ static int qseecom_send_modfd_resp(struct qseecom_dev_handle *data,
 		}
 	}
 
-	if (((uint32_t)resp.resp_buf_ptr <
-			this_lstnr->user_virt_sb_base)
-			|| ((uint32_t)resp.resp_buf_ptr >=
-			(this_lstnr->user_virt_sb_base +
-			this_lstnr->sb_length))) {
+	if ((resp.resp_buf_ptr < this_lstnr->user_virt_sb_base) ||
+		((uintptr_t)resp.resp_buf_ptr >=
+		((uintptr_t)this_lstnr->user_virt_sb_base +
+				this_lstnr->sb_length))) {
 		pr_err("resp_buf_ptr address not within shared buffer\n");
 		return -EINVAL;
 	}
-	resp.resp_buf_ptr = (uint32_t)this_lstnr->sb_virt +
-		(resp.resp_buf_ptr - this_lstnr->user_virt_sb_base);
+	resp.resp_buf_ptr = this_lstnr->sb_virt +
+		(uintptr_t)(resp.resp_buf_ptr - this_lstnr->user_virt_sb_base);
 	__qseecom_update_cmd_buf(&resp, false, data, true);
 	qseecom.send_resp_flag = 1;
 	wake_up_interruptible(&qseecom.send_resp_wq);
@@ -2799,7 +2746,7 @@ static int qseecom_load_external_elf(struct qseecom_dev_handle *data,
 	int ret;
 	int set_cpu_ret = 0;
 	ion_phys_addr_t pa = 0;
-	uint32_t len;
+	size_t len;
 	struct cpumask mask;
 	struct qseecom_load_app_ireq load_req;
 	struct qseecom_command_scm_resp resp;
@@ -2831,7 +2778,7 @@ static int qseecom_load_external_elf(struct qseecom_dev_handle *data,
 	load_req.qsee_cmd_id = QSEOS_LOAD_EXTERNAL_ELF_COMMAND;
 	load_req.mdt_len = load_img_req.mdt_len;
 	load_req.img_len = load_img_req.img_len;
-	load_req.phy_addr = pa;
+	load_req.phy_addr = (uint32_t)pa;
 
 	/* SCM_CALL tied to Core0 */
 	mask = CPU_MASK_CPU0;
@@ -3529,16 +3476,18 @@ static int __qseecom_qteec_validate_msg(struct qseecom_dev_handle *data,
 		pr_err("cmd buffer or response buffer is null\n");
 		return -EINVAL;
 	}
-	if (((uint32_t)req->req_ptr < data->client.user_virt_sb_base) ||
-		((uint32_t)req->req_ptr >= (data->client.user_virt_sb_base +
-					data->client.sb_length))) {
+	if (((uintptr_t)req->req_ptr <
+			data->client.user_virt_sb_base) ||
+		((uintptr_t)req->req_ptr >=
+		(data->client.user_virt_sb_base + data->client.sb_length))) {
 		pr_err("cmd buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
 
-	if (((uint32_t)req->resp_ptr < data->client.user_virt_sb_base)  ||
-		((uint32_t)req->resp_ptr >= (data->client.user_virt_sb_base +
-					data->client.sb_length))){
+	if (((uintptr_t)req->resp_ptr <
+			data->client.user_virt_sb_base)  ||
+		((uintptr_t)req->resp_ptr >=
+		(data->client.user_virt_sb_base + data->client.sb_length))) {
 		pr_err("response buffer address not within shared bufffer\n");
 		return -EINVAL;
 	}
@@ -3565,21 +3514,16 @@ static int __qseecom_qteec_issue_cmd(struct qseecom_dev_handle *data,
 	int ret = 0;
 	uint32_t reqd_len_sb_in = 0;
 
-	if (!data || !data->client.ihandle) {
-		pr_err("Client or client handle is not initialized\n");
-		return -EINVAL;
-	}
-
 	ret  = __qseecom_qteec_validate_msg(data, req);
 	if (ret)
 		return ret;
 	ireq.qsee_cmd_id = cmd_id;
 	ireq.app_id = data->client.app_id;
-	ireq.req_ptr = (void *)__qseecom_uvirt_to_kphys(data,
-						(uint32_t)req->req_ptr);
+	ireq.req_ptr = (uint32_t)__qseecom_uvirt_to_kphys(data,
+						(uintptr_t)req->req_ptr);
 	ireq.req_len = req->req_len;
-	ireq.resp_ptr = (void *)__qseecom_uvirt_to_kphys(data,
-						(uint32_t)req->resp_ptr);
+	ireq.resp_ptr = (uint32_t)__qseecom_uvirt_to_kphys(data,
+						(uintptr_t)req->resp_ptr);
 	ireq.resp_len = req->resp_len;
 
 	reqd_len_sb_in = req->req_len + req->resp_len;
@@ -3664,11 +3608,6 @@ static int qseecom_qteec_invoke_modfd_cmd(struct qseecom_dev_handle *data,
 		return ret;
 	}
 
-	if (!data || !data->client.ihandle) {
-		pr_err("Client or client handle is not initialized\n");
-		return -EINVAL;
-	}
-
 	ret = __qseecom_qteec_validate_msg(data,
 					(struct qseecom_qteec_req *)(&req));
 	if (ret)
@@ -3676,11 +3615,11 @@ static int qseecom_qteec_invoke_modfd_cmd(struct qseecom_dev_handle *data,
 
 	ireq.qsee_cmd_id = QSEOS_TEE_INVOKE_COMMAND;
 	ireq.app_id = data->client.app_id;
-	ireq.req_ptr = (void *)__qseecom_uvirt_to_kphys(data,
-						(uint32_t)req.cmd_req_buf);
+	ireq.req_ptr = (uint32_t)__qseecom_uvirt_to_kphys(data,
+						(uintptr_t)req.cmd_req_buf);
 	ireq.req_len = req.cmd_req_len;
-	ireq.resp_ptr = (void *)__qseecom_uvirt_to_kphys(data,
-						(uint32_t)req.resp_buf);
+	ireq.resp_ptr = (uint32_t)__qseecom_uvirt_to_kphys(data,
+						(uintptr_t)req.resp_buf);
 	ireq.resp_len = req.resp_len;
 	reqd_len_sb_in = req.cmd_req_len + req.resp_len;
 
@@ -3692,9 +3631,9 @@ static int qseecom_qteec_invoke_modfd_cmd(struct qseecom_dev_handle *data,
 		}
 	}
 	req.cmd_req_buf = (void *)__qseecom_uvirt_to_kvirt(data,
-						(uint32_t)req.cmd_req_buf);
+						(uintptr_t)req.cmd_req_buf);
 	req.resp_buf = (void *)__qseecom_uvirt_to_kvirt(data,
-						(uint32_t)req.resp_buf);
+						(uintptr_t)req.resp_buf);
 	ret = __qseecom_update_cmd_buf(&req, false, data, true);
 	if (ret)
 		return ret;
@@ -3734,13 +3673,11 @@ static int qseecom_qteec_invoke_modfd_cmd(struct qseecom_dev_handle *data,
 	return 0;
 }
 
-static long qseecom_ioctl(struct file *file, unsigned cmd,
-		unsigned long arg)
+long qseecom_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
 	int ret = 0;
 	struct qseecom_dev_handle *data = file->private_data;
 	void __user *argp = (void __user *) arg;
-	bool perf_enabled = false;
 
 	if (!data) {
 		pr_err("Invalid/uninitialized device handle\n");
@@ -3813,33 +3750,11 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 				break;
 			}
 		}
-		/*
-		* On targets where crypto clock is handled by HLOS,
-		* if clk_access_cnt is zero and perf_enabled is false,
-		* then the crypto clock was not enabled before sending cmd
-		* to tz, qseecom will enable the clock to avoid service failure.
-		*/
-		if (!qseecom.qsee.clk_access_cnt && !data->perf_enabled) {
-			pr_debug("ce clock is not enabled!\n");
-			ret = qseecom_perf_enable(data);
-			if (ret) {
-				pr_err("Failed to vote for clock with err %d\n",
-						ret);
-				mutex_unlock(&app_access_lock);
-				ret = -EINVAL;
-				break;
-			}
-			perf_enabled = true;
-		}
 		atomic_inc(&data->ioctl_count);
 		ret = qseecom_send_cmd(data, argp);
 		if (qseecom.support_bus_scaling)
 			__qseecom_add_bw_scale_down_timer(
 				QSEECOM_SEND_CMD_CRYPTO_TIMEOUT);
-		if (perf_enabled) {
-			qsee_disable_clock_vote(data, CLK_DFAB);
-			qsee_disable_clock_vote(data, CLK_SFPB);
-		}
 		atomic_dec(&data->ioctl_count);
 		wake_up_all(&data->abort_wq);
 		mutex_unlock(&app_access_lock);
@@ -3872,33 +3787,11 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 				break;
 			}
 		}
-		/*
-		* On targets where crypto clock is handled by HLOS,
-		* if clk_access_cnt is zero and perf_enabled is false,
-		* then the crypto clock was not enabled before sending cmd
-		* to tz, qseecom will enable the clock to avoid service failure.
-		*/
-		if (!qseecom.qsee.clk_access_cnt && !data->perf_enabled) {
-			pr_debug("ce clock is not enabled!\n");
-			ret = qseecom_perf_enable(data);
-			if (ret) {
-				pr_err("Failed to vote for clock with err %d\n",
-						ret);
-				mutex_unlock(&app_access_lock);
-				ret = -EINVAL;
-				break;
-			}
-			perf_enabled = true;
-		}
 		atomic_inc(&data->ioctl_count);
 		ret = qseecom_send_modfd_cmd(data, argp);
 		if (qseecom.support_bus_scaling)
 			__qseecom_add_bw_scale_down_timer(
 				QSEECOM_SEND_CMD_CRYPTO_TIMEOUT);
-		if (perf_enabled) {
-			qsee_disable_clock_vote(data, CLK_DFAB);
-			qsee_disable_clock_vote(data, CLK_SFPB);
-		}
 		atomic_dec(&data->ioctl_count);
 		wake_up_all(&data->abort_wq);
 		mutex_unlock(&app_access_lock);
@@ -3947,7 +3840,7 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 			ret = -EINVAL;
 			break;
 		}
-		pr_debug("SET_MEM_PARAM: qseecom addr = 0x%x\n", (u32)data);
+		pr_debug("SET_MEM_PARAM: qseecom addr = 0x%p\n", data);
 		ret = qseecom_set_client_mem_param(data, argp);
 		if (ret)
 			pr_err("failed Qqseecom_set_mem_param request: %d\n",
@@ -3963,7 +3856,7 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 			break;
 		}
 		data->type = QSEECOM_CLIENT_APP;
-		pr_debug("LOAD_APP_REQ: qseecom_addr = 0x%x\n", (u32)data);
+		pr_debug("LOAD_APP_REQ: qseecom_addr = 0x%p\n", data);
 		mutex_lock(&app_access_lock);
 		atomic_inc(&data->ioctl_count);
 		if (qseecom.qsee_version > QSEEE_VERSION_00) {
@@ -3989,7 +3882,7 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 			ret = -EINVAL;
 			break;
 		}
-		pr_debug("UNLOAD_APP: qseecom_addr = 0x%x\n", (u32)data);
+		pr_debug("UNLOAD_APP: qseecom_addr = 0x%p\n", data);
 		mutex_lock(&app_access_lock);
 		atomic_inc(&data->ioctl_count);
 		ret = qseecom_unload_app(data);
@@ -4028,9 +3921,12 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 			__qseecom_register_bus_bandwidth_needs(data, HIGH);
 			mutex_unlock(&qsee_bw_mutex);
 		} else {
-			ret = qseecom_perf_enable(data);
+			ret = qsee_vote_for_clock(data, CLK_DFAB);
 			if (ret)
-				pr_err("Fail to vote for clocks %d\n", ret);
+				pr_err("Fail to vote for DFAB clock%d\n", ret);
+			ret = qsee_vote_for_clock(data, CLK_SFPB);
+			if (ret)
+				pr_err("Fail to vote for SFPB clock%d\n", ret);
 		}
 		atomic_dec(&data->ioctl_count);
 		break;
@@ -4115,7 +4011,7 @@ static long qseecom_ioctl(struct file *file, unsigned cmd,
 		data->type = QSEECOM_CLIENT_APP;
 		mutex_lock(&app_access_lock);
 		atomic_inc(&data->ioctl_count);
-		pr_debug("APP_LOAD_QUERY: qseecom_addr = 0x%x\n", (u32)data);
+		pr_debug("APP_LOAD_QUERY: qseecom_addr = 0x%p\n", data);
 		ret = qseecom_query_app_loaded(data, argp);
 		atomic_dec(&data->ioctl_count);
 		mutex_unlock(&app_access_lock);
@@ -4361,8 +4257,8 @@ static int qseecom_release(struct inode *inode, struct file *file)
 	int ret = 0;
 
 	if (data->released == false) {
-		pr_debug("data: released=false, type=%d, mode=%d, data=0x%x\n",
-			data->type, data->mode, (u32)data);
+		pr_debug("data: released=false, type=%d, mode=%d, data=0x%p\n",
+			data->type, data->mode, data);
 		switch (data->type) {
 		case QSEECOM_LISTENER_SERVICE:
 			ret = qseecom_unregister_listener(data);
@@ -4410,6 +4306,9 @@ static int qseecom_release(struct inode *inode, struct file *file)
 static const struct file_operations qseecom_fops = {
 		.owner = THIS_MODULE,
 		.unlocked_ioctl = qseecom_ioctl,
+#ifdef CONFIG_COMPAT
+		.compat_ioctl = compat_qseecom_ioctl,
+#endif
 		.open = qseecom_open,
 		.release = qseecom_release
 };
@@ -4620,7 +4519,7 @@ static int qseecom_probe(struct platform_device *pdev)
 	qseecom.commonlib_loaded = false;
 	qseecom.pdev = class_dev;
 	/* Create ION msm client */
-	qseecom.ion_clnt = msm_ion_client_create("qseecom-kernel");
+	qseecom.ion_clnt = msm_ion_client_create(-1, "qseecom-kernel");
 	if (qseecom.ion_clnt == NULL) {
 		pr_err("Ion client cannot be created\n");
 		rc = -ENOMEM;
