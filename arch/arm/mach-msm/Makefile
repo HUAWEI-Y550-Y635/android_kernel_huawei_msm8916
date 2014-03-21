@@ -52,7 +52,6 @@ obj-$(CONFIG_MSM_PM) += ext-buck-control.o
 CFLAGS_msm_vibrator.o += -Idrivers/staging/android
 
 obj-$(CONFIG_MSM_LPM_TEST) += test-lpm.o
-obj-$(CONFIG_MSM_TZ_LOG) += tz_log.o
 
 
 obj-$(CONFIG_ARCH_MSM8974) += gpiomux-v2.o gpiomux.o

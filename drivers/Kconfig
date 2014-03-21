@@ -194,4 +194,6 @@ source "drivers/huawei/Kconfig"
 source "drivers/srecorder/Kconfig"
 # /* DTS20141205XXXXX qidechun/yantongguang 2014-12-05 end */ 
 
+source "drivers/firmware/Kconfig"
+
 endmenu
