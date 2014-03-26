@@ -58,42 +58,94 @@ struct diagchar_dev *driver;
 struct diagchar_priv {
 	int pid;
 };
-/* The following variables can be specified by module options */
- /* for copy buffer */
-static unsigned int itemsize = 4096; /*Size of item in the mempool */
-static unsigned int poolsize = 12; /*Number of items in the mempool */
-/* for hdlc buffer */
-static unsigned int itemsize_hdlc = 8192; /*Size of item in the mempool */
-static unsigned int poolsize_hdlc = 10;  /*Number of items in the mempool */
-/* for user buffer */
-static unsigned int itemsize_user = 8192; /*Size of item in the mempool */
-static unsigned int poolsize_user = 8;  /*Number of items in the mempool */
-/* for write structure buffer */
-/*Size of item in the mempool */
-static unsigned int itemsize_write_struct = sizeof(struct diag_request);
-static unsigned int poolsize_write_struct = 10;/* Num of items in the mempool */
-/* For the dci memory pool */
-static unsigned int itemsize_dci = IN_BUF_SIZE; /*Size of item in the mempool */
-static unsigned int poolsize_dci = 10;  /*Number of items in the mempool */
+
+/* Memory pool variables */
+/* Used for copying any incoming packet from user space clients. */
+static unsigned int itemsize = 4096;
+static unsigned int poolsize = 12;
+module_param(itemsize, uint, 0);
+module_param(poolsize, uint, 0);
+
+/*
+ * Used for HDLC encoding packets coming from the user
+ * space. Itemsize is defined in diagchar_init. HDLC
+ * Buffer can be at most twice as long as the itemsize.
+ * Add 3 bytes for CRC bytes and delimiter. Don't expose
+ * itemsize_hdlc as it is dependent on itemsize.By
+ * default it is set to DIAG_HDLC_BUF_SIZE (8K)
+ */
+static unsigned int itemsize_hdlc = DIAG_HDLC_BUF_SIZE;
+static unsigned int poolsize_hdlc = 10;
+module_param(poolsize_hdlc, uint, 0);
+
+/*
+ * This is used for incoming DCI requests from the user space clients.
+ * Don't expose itemsize as it is internal.
+ */
+static unsigned int itemsize_user = 8192;
+static unsigned int poolsize_user = 8;
+module_param(poolsize_user, uint, 0);
+
+/*
+ * USB structures allocated for writing Diag data generated on the Apps to USB.
+ * Don't expose itemsize as it is constant.
+ */
+static unsigned int itemsize_usb_apps = sizeof(struct diag_request);
+static unsigned int poolsize_usb_apps = 10;
+module_param(poolsize_usb_apps, uint, 0);
+
+/* Used for DCI client buffers. Don't expose itemsize as it is constant. */
+static unsigned int itemsize_dci = IN_BUF_SIZE;
+static unsigned int poolsize_dci = 10;
+module_param(poolsize_dci, uint, 0);
+
+#ifdef CONFIG_DIAGFWD_BRIDGE_CODE
+/* Used for reading data from the remote device. */
+static unsigned int itemsize_mdm = DIAG_MDM_BUF_SIZE;
+static unsigned int poolsize_mdm = 8;
+module_param(itemsize_mdm, uint, 0);
+module_param(poolsize_mdm, uint, 0);
+
+/*
+ * Used for reading DCI data from the remote device.
+ * Don't expose poolsize for DCI data. There is only one read buffer
+ */
+static unsigned int itemsize_mdm_dci = DIAG_MDM_BUF_SIZE;
+static unsigned int poolsize_mdm_dci = 1;
+module_param(itemsize_mdm_dci, uint, 0);
+
+/*
+ * Used for USB structues associated with a remote device.
+ * Don't expose the itemsize since it is constant.
+ */
+static unsigned int itemsize_mdm_usb = sizeof(struct diag_request);
+static unsigned int poolsize_mdm_usb = 8;
+module_param(poolsize_mdm_usb, uint, 0);
+
+/*
+ * Used for writing read DCI data to remote peripherals. Don't
+ * expose poolsize for DCI data. There is only one read
+ * buffer. Add 6 bytes for DCI header information: Start (1),
+ * Version (1), Length (2), Tag (2)
+ */
+static unsigned int itemsize_mdm_dci_write = DIAG_MDM_DCI_BUF_SIZE;
+static unsigned int poolsize_mdm_dci_write = 1;
+module_param(itemsize_mdm_dci_write, uint, 0);
+#endif
+
 /* This is the max number of user-space clients supported at initialization*/
 static unsigned int max_clients = 15;
 static unsigned int threshold_client_limit = 30;
-#ifdef CONFIG_HUAWEI_KERNEL
-int diag_max_reg = 850;
-int diag_threshold_reg = 1000;
-#else
+module_param(max_clients, uint, 0);
+
 /* This is the maximum number of pkt registrations supported at initialization*/
 int diag_max_reg = 600;
 int diag_threshold_reg = 750;
-#endif
 
 /* Timer variables */
 static struct timer_list drain_timer;
 static int timer_in_progress;
 void *buf_hdlc;
-module_param(itemsize, uint, 0);
-module_param(poolsize, uint, 0);
-module_param(max_clients, uint, 0);
 
 #define DIAGPKT_MAX_DELAYED_RSP 0xFFFF
 
@@ -199,7 +251,7 @@ void diag_clear_hsic_tbl(void)
 					/* Return the buffer to the pool */
 					diagmem_free(driver, (unsigned char *)
 						(diag_hsic[j].hsic_buf_tbl[i].
-						 buf), j+POOL_TYPE_HSIC);
+						 buf), j+POOL_TYPE_MDM);
 					diag_hsic[j].hsic_buf_tbl[i].buf = 0;
 				}
 				diag_hsic[j].hsic_buf_tbl[i].length = 0;
@@ -223,6 +275,20 @@ void diag_add_client(int i, struct file *file)
 	file->private_data = diagpriv_data;
 	strlcpy(driver->client_map[i].name, current->comm, 20);
 	driver->client_map[i].name[19] = '\0';
+}
+
+static void diag_mempool_init(void)
+{
+	int i = 0;
+	for (i = 0; i < POOL_TYPE_LOCAL_LAST; i++)
+		diagmem_init(driver, i);
+}
+
+static void diag_mempool_exit(void)
+{
+	int i = 0;
+	for (i = 0; i < POOL_TYPE_LOCAL_LAST; i++)
+		diagmem_exit(driver, i);
 }
 
 static int diagchar_open(struct inode *inode, struct file *file)
@@ -277,7 +343,7 @@ static int diagchar_open(struct inode *inode, struct file *file)
 		driver->data_ready[i] |= DCI_EVENT_MASKS_TYPE;
 
 		if (driver->ref_count == 0)
-			diagmem_init(driver);
+			diag_mempool_init();
 		driver->ref_count++;
 		mutex_unlock(&driver->diagchar_mutex);
 		return 0;
@@ -351,38 +417,6 @@ static int diagchar_close(struct inode *inode, struct file *file)
 		diag_switch_logging(USB_MODE);
 		diag_ws_reset(DIAG_WS_MD);
 	}
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-	if (driver->mixed_qmdlog_pid == current->tgid)
-	{
-		driver->mixed_qmdlog_flag = 0;
-		driver->mixed_qmdlog_pid = 0;
-		/*when usb qxdm port used, clear the in_busy_file_x flag*/
-		if (driver->usb_connected) {
-			for (i = 0; i < NUM_SMD_DATA_CHANNELS; i++) {
-				driver->smd_data[i].in_busy_file_1 = 0;
-				driver->smd_data[i].in_busy_file_2 = 0;
-				driver->smd_data[i].in_busy_usb_1 = 0;
-				driver->smd_data[i].in_busy_usb_2 = 0;
-				driver->smd_data[i].in_busy_1 = 0;
-				driver->smd_data[i].in_busy_2 = 0;		
-			}
-
-			if (driver->supports_separate_cmdrsp) {
-				for (i = 0; i < NUM_SMD_CMD_CHANNELS; i++) {
-					driver->smd_cmd[i].in_busy_file_1 = 0;
-					driver->smd_cmd[i].in_busy_file_2 = 0;
-					driver->smd_cmd[i].in_busy_usb_1 = 0;
-					driver->smd_cmd[i].in_busy_usb_2 = 0;
-					driver->smd_cmd[i].in_busy_1 = 0;
-					driver->smd_cmd[i].in_busy_2 = 0;	
-				}
-			}
-		}
-		diag_update_proc_vote(DIAG_PROC_MEMORY_DEVICE, VOTE_DOWN, ALL_PROC);
-		queue_work(driver->diag_real_time_wq,
-						&driver->diag_real_time_work);
-	}
-#endif
 #endif /* DIAG over USB */
 	/* Delete the pkt response table entry for the exiting process */
 	for (i = 0; i < diag_max_reg; i++)
@@ -391,12 +425,9 @@ static int diagchar_close(struct inode *inode, struct file *file)
 
 	mutex_lock(&driver->diagchar_mutex);
 	driver->ref_count--;
-	/* On Client exit, try to destroy all 5 pools */
-	diagmem_exit(driver, POOL_TYPE_COPY);
-	diagmem_exit(driver, POOL_TYPE_HDLC);
-	diagmem_exit(driver, POOL_TYPE_USER);
-	diagmem_exit(driver, POOL_TYPE_WRITE_STRUCT);
-	diagmem_exit(driver, POOL_TYPE_DCI);
+	if (driver->ref_count == 0)
+		diag_mempool_exit();
+
 	for (i = 0; i < driver->num_clients; i++) {
 		if (NULL != diagpriv_data && diagpriv_data->pid ==
 						driver->client_map[i].pid) {
@@ -609,7 +640,7 @@ drop_hsic:
 				/* Return the buffer to the pool */
 				diagmem_free(driver,
 					(unsigned char *)(hsic_buf_tbl[i].buf),
-					index+POOL_TYPE_HSIC);
+					index+POOL_TYPE_MDM);
 
 				/* Call the write complete function */
 				diagfwd_write_complete_hsic(NULL, index);
@@ -1370,9 +1401,6 @@ long diagchar_ioctl(struct file *filp,
 		if (copy_from_user((void *)&req_logging_mode,
 					(void __user *)ioarg, sizeof(int)))
 			return -EFAULT;
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-		pr_info("diag: In %s, request to switch to mode : %d\n", __func__, req_logging_mode);
-#endif
 		result = diag_switch_logging(req_logging_mode);
 		break;
 	case DIAG_IOCTL_REMOTE_DEV:
@@ -1389,27 +1417,6 @@ long diagchar_ioctl(struct file *filp,
 	case DIAG_IOCTL_GET_REAL_TIME:
 		result = diag_ioctl_get_real_time(ioarg);
 		break;
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-	case DIAG_IOCTL_QXDM_LOG:
-		pr_info("%s DIAG_IOCTL_QXDM_LOG\n", __func__);
-		/*value the flag of mixed_qmdlog_flag and current user space thread tgid */
-		driver->mixed_qmdlog_flag = 1;
-		driver->mixed_qmdlog_pid = current->tgid;
-		if (!driver->usb_connected)
-		{
-			int i = 0;
-			diag_reset_smd_data(RESET_AND_QUEUE);
-			for (i = 0; i < NUM_SMD_CONTROL_CHANNELS; i++) {
-				/* Poll SMD CNTL channels to check for data */
-				diag_smd_notify(&(driver->smd_cntl[i]), SMD_EVENT_DATA);
-			}
-		}
-		diag_update_proc_vote(DIAG_PROC_MEMORY_DEVICE, VOTE_UP, ALL_PROC);
-		queue_work(driver->diag_real_time_wq,
-						&driver->diag_real_time_work);
-		result = 0;
-		break;
-#endif
 	}
 	return result;
 }
@@ -1444,13 +1451,8 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 
 	mutex_lock(&driver->diagchar_mutex);
 
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-	if ((driver->data_ready[index] & USER_SPACE_DATA_TYPE)
-			&& (driver->logging_mode == MEMORY_DEVICE_MODE || driver->mixed_qmdlog_flag)) {
-#else
 	if ((driver->data_ready[index] & USER_SPACE_DATA_TYPE) && (driver->
 					logging_mode == MEMORY_DEVICE_MODE)) {
-#endif
 		remote_token = 0;
 		pr_debug("diag: process woken up\n");
 		/*Copy the type of data being passed*/
@@ -1531,23 +1533,7 @@ drop:
 					*(data->buf_in_1),
 					data->write_ptr_1->length);
 				spin_lock_irqsave(&data->in_busy_lock, flags);
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-				if (driver->mixed_qmdlog_flag)
-				{
-					data->in_busy_file_1 = 0;
-					/*the user read out the data then clear the smd data flag */
-					if(!data->in_busy_usb_1)
-					{
-						data->in_busy_1 = 0;
-					}
-				}
-				else
-				{
-					data->in_busy_1 = 0;
-				}
-#else
 				data->in_busy_1 = 0;
-#endif
 				spin_unlock_irqrestore(&data->in_busy_lock,
 						       flags);
 				diag_ws_on_copy(DIAG_WS_MD);
@@ -1563,22 +1549,7 @@ drop:
 					*(data->buf_in_2),
 					data->write_ptr_2->length);
 				spin_lock_irqsave(&data->in_busy_lock, flags);
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-				if (driver->mixed_qmdlog_flag)
-				{
-					data->in_busy_file_2 = 0;
-					if(!data->in_busy_usb_2)
-					{
-						data->in_busy_2 = 0;
-					}
-				}
-				else
-				{
-					data->in_busy_2 = 0;
-				}
-#else
 				data->in_busy_2 = 0;
-#endif
 				spin_unlock_irqrestore(&data->in_busy_lock,
 						       flags);
 				diag_ws_on_copy(DIAG_WS_MD);
@@ -1601,22 +1572,7 @@ drop:
 					COPY_USER_SPACE_OR_EXIT(buf+ret,
 						*(data->buf_in_1),
 						data->write_ptr_1->length);
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-					if (driver->mixed_qmdlog_flag)
-					{
-						data->in_busy_file_1 = 0;
-						if(!data->in_busy_usb_1)
-						{
-							data->in_busy_1 = 0;
-						}
-					}
-					else
-					{
-						data->in_busy_1 = 0;
-					}
-#else
 					data->in_busy_1 = 0;
-#endif
 				}
 			}
 		}
@@ -1825,16 +1781,6 @@ static ssize_t diagchar_write(struct file *file, const char __user *buf,
 		return -EBADMSG;
 	}
 #ifdef CONFIG_DIAG_OVER_USB
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-	if (driver->logging_mode == NO_LOGGING_MODE ||
-	    (!((pkt_type == DCI_DATA_TYPE) ||
-	       ((pkt_type & (DATA_TYPE_DCI_LOG | DATA_TYPE_DCI_EVENT)) == 0))
-		&& (driver->logging_mode == USB_MODE) &&
-		(!driver->usb_connected && !driver->mixed_qmdlog_flag))) {
-		/*Drop the diag payload */
-		return -EIO;
-	}
-#else
 	if (driver->logging_mode == NO_LOGGING_MODE ||
 	    (!((pkt_type == DCI_DATA_TYPE) ||
 	       ((pkt_type & (DATA_TYPE_DCI_LOG | DATA_TYPE_DCI_EVENT)) == 0))
@@ -1843,7 +1789,6 @@ static ssize_t diagchar_write(struct file *file, const char __user *buf,
 		/*Drop the diag payload */
 		return -EIO;
 	}
-#endif
 #endif /* DIAG over USB */
 	if (pkt_type == DCI_DATA_TYPE) {
 		user_space_data = diagmem_alloc(driver, payload_size,
@@ -2006,11 +1951,7 @@ static ssize_t diagchar_write(struct file *file, const char __user *buf,
 		}
 
 		/* Check masks for On-Device logging */
-#ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
-		if (driver->mask_check || driver->mixed_qmdlog_flag) {
-#else
 		if (driver->mask_check) {
-#endif
 			if (!mask_request_validate(driver->user_space_data_buf +
 							 token_offset)) {
 				pr_alert("diag: mask request Invalid\n");
@@ -2660,14 +2601,21 @@ static int __init diagchar_init(void)
 	setup_timer(&drain_timer, drain_timer_func, 1234);
 	driver->itemsize = itemsize;
 	driver->poolsize = poolsize;
+	/*
+	 * HDLC buffer can be at most twice as much as itemsize. Add 3 for
+	 * 16-bit CRC and delimiter.
+	 */
+	itemsize_hdlc = (itemsize * 2) + 3;
 	driver->itemsize_hdlc = itemsize_hdlc;
 	driver->poolsize_hdlc = poolsize_hdlc;
-	driver->itemsize_user = itemsize_user;
-	driver->poolsize_user = poolsize_user;
-	driver->itemsize_write_struct = itemsize_write_struct;
-	driver->poolsize_write_struct = poolsize_write_struct;
 	driver->itemsize_dci = itemsize_dci;
 	driver->poolsize_dci = poolsize_dci;
+	diagmem_setsize(POOL_TYPE_COPY, itemsize, poolsize);
+	diagmem_setsize(POOL_TYPE_HDLC, itemsize_hdlc, poolsize_hdlc);
+	diagmem_setsize(POOL_TYPE_USER, itemsize_user, poolsize_user);
+	diagmem_setsize(POOL_TYPE_USB_APPS, itemsize_usb_apps,
+			poolsize_usb_apps);
+	diagmem_setsize(POOL_TYPE_DCI, itemsize_dci, poolsize_dci);
 	driver->num_clients = max_clients;
 	driver->logging_mode = USB_MODE;
 	driver->socket_process = NULL;
@@ -2694,6 +2642,18 @@ static int __init diagchar_init(void)
 	if (ret)
 		goto fail;
 #ifdef CONFIG_DIAGFWD_BRIDGE_CODE
+	diagmem_setsize(POOL_TYPE_MDM, itemsize_mdm, poolsize_mdm);
+	diagmem_setsize(POOL_TYPE_MDM2, itemsize_mdm, poolsize_mdm);
+	diagmem_setsize(POOL_TYPE_MDM_DCI, itemsize_mdm_dci, poolsize_mdm_dci);
+	diagmem_setsize(POOL_TYPE_MDM2_DCI, itemsize_mdm_dci,
+			poolsize_mdm_dci);
+	diagmem_setsize(POOL_TYPE_MDM_USB, itemsize_mdm_usb, poolsize_mdm_usb);
+	diagmem_setsize(POOL_TYPE_MDM2_USB, itemsize_mdm_usb, poolsize_mdm_usb);
+	diagmem_setsize(POOL_TYPE_MDM_DCI_WRITE, itemsize_mdm_dci_write,
+			poolsize_mdm_dci_write);
+	diagmem_setsize(POOL_TYPE_MDM2_DCI_WRITE, itemsize_mdm_dci_write,
+			poolsize_mdm_dci_write);
+
 	ret = diagfwd_bridge_init(HSIC_DATA_CH);
 	if (ret)
 		goto fail;
@@ -2760,9 +2720,7 @@ fail:
 static void diagchar_exit(void)
 {
 	printk(KERN_INFO "diagchar exiting ..\n");
-	/* On Driver exit, send special pool type to
-	 ensure no memory leaks */
-	diagmem_exit(driver, POOL_TYPE_ALL);
+	diag_mempool_exit();
 	diagfwd_exit();
 	diagfwd_cntl_exit();
 	diag_dci_exit();
