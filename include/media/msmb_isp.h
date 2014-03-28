@@ -165,6 +165,7 @@ struct msm_vfe_axi_stream_request_cmd {
 	uint8_t buf_divert; /* if TRUE no vb2 buf done. */
 	/*Return values*/
 	uint32_t axi_stream_handle;
+	uint32_t controllable_output;
 	uint32_t burst_len;
 };
 
