@@ -127,6 +127,10 @@ struct usb_phy {
 	/* reset the PHY clocks */
 	int	(*reset)(struct usb_phy *x);
 
+	/* To enable/disable phy autosuspend feature */
+	int	(*set_phy_autosuspend)(struct usb_phy *x, struct device *dev,
+				int enable_autosuspend);
+
 	/* for notification of usb_phy_dbg_events */
 	void	(*dbg_event)(struct usb_phy *x,
 			char *event, int msg1, int msg2);
