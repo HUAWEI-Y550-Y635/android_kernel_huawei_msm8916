@@ -41,17 +41,19 @@ bool msm_spm_is_mode_avail(unsigned int mode);
 void msm_spm_dump_regs(unsigned int cpu);
 #if defined(CONFIG_MSM_L2_SPM)
 
-int msm_spm_apcs_set_phase(unsigned int phase_cnt);
-int msm_spm_enable_fts_lpm(uint32_t mode);
+/* Public functions */
+
+int msm_spm_apcs_set_phase(int cpu, unsigned int phase_cnt);
+int msm_spm_enable_fts_lpm(int cpu, uint32_t mode);
 
 #else
 
-static inline int msm_spm_apcs_set_phase(unsigned int phase_cnt)
+static inline int msm_spm_apcs_set_phase(int cpu, unsigned int phase_cnt)
 {
 	return -ENOSYS;
 }
 
-static inline int msm_spm_enable_fts_lpm(uint32_t mode)
+static inline int msm_spm_enable_fts_lpm(int cpu, uint32_t mode)
 {
 	return -ENOSYS;
 }
