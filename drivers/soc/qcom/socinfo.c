@@ -479,8 +479,8 @@ static struct msm_soc_info cpu_of_id[] = {
 	[237] = {MSM_CPU_ZIRC, "MSMZIRC"},
 	[238] = {MSM_CPU_ZIRC, "MSMZIRC"},
 
-	/* PLUTONIUM ID */
-	[207] = {MSM_CPU_PLUTONIUM},
+	/* 8994 ID */
+	[207] = {MSM_CPU_8994},
 
 	/* Uninitialized IDs are not known to run Linux.
 	   MSM_CPU_UNKNOWN is set to 0 to ensure these IDs are
@@ -1016,9 +1016,9 @@ static void * __init setup_dummy_socinfo(void)
 		dummy_socinfo.id = 238;
 		strlcpy(dummy_socinfo.build_id, "msmzirc - ",
 			sizeof(dummy_socinfo.build_id));
-	} else if (early_machine_is_msmplutonium()) {
+	} else if (early_machine_is_msm8994()) {
 		dummy_socinfo.id = 207;
-		strlcpy(dummy_socinfo.build_id, "msmplutonium - ",
+		strlcpy(dummy_socinfo.build_id, "msm8994 - ",
 			sizeof(dummy_socinfo.build_id));
 	}
 
