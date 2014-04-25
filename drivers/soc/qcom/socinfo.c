@@ -412,9 +412,6 @@ static struct msm_soc_info cpu_of_id[] = {
 	[223] = {MSM_CPU_8226, "MSM8628"},
 	[224] = {MSM_CPU_8226, "MSM8928"},
 
-	/* 8092 IDs */
-	[146] = {MSM_CPU_8092, "MPQ8092"},
-
 	/* 8610 IDs */
 	[147] = {MSM_CPU_8610, "MSM8610"},
 	[161] = {MSM_CPU_8610, "MSM8110"},
@@ -995,21 +992,13 @@ static struct device_attribute select_image =
 
 static void * __init setup_dummy_socinfo(void)
 {
-	if (early_machine_is_mpq8092()) {
-		dummy_socinfo.id = 146;
-		strlcpy(dummy_socinfo.build_id, "mpq8092 - ",
-		sizeof(dummy_socinfo.build_id));
-	} else if (early_machine_is_apq8084()) {
+	if (early_machine_is_apq8084()) {
 		dummy_socinfo.id = 178;
 		strlcpy(dummy_socinfo.build_id, "apq8084 - ",
 			sizeof(dummy_socinfo.build_id));
 	} else if (early_machine_is_mdm9630()) {
 		dummy_socinfo.id = 187;
 		strlcpy(dummy_socinfo.build_id, "mdm9630 - ",
-			sizeof(dummy_socinfo.build_id));
-	} else if (early_machine_is_msmsamarium()) {
-		dummy_socinfo.id = 195;
-		strlcpy(dummy_socinfo.build_id, "msmsamarium - ",
 			sizeof(dummy_socinfo.build_id));
 	} else if (early_machine_is_msm8916()) {
 		dummy_socinfo.id = 206;
