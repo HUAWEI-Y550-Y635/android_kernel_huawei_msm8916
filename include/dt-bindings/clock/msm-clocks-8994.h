@@ -155,6 +155,8 @@
 #define clk_usb30_mock_utmi_clk_src 0xa024a976
 #define clk_usb3_phy_aux_clk_src 0x15eec63c
 #define clk_usb_hs_system_clk_src 0x28385546
+#define clk_gcc_usb3_phy_reset 0x03d559f1
+#define clk_gcc_usb3phy_phy_reset 0xb1a4f885
 #define clk_gpll0_out_mmsscc 0x0ded70aa
 #define clk_pcie_0_phy_ldo 0x1d30d092
 #define clk_pcie_1_phy_ldo 0x63474b42
@@ -369,6 +371,23 @@
 #define clk_venus0_core1_vcodec_clk 0x6324869c
 #define clk_venus0_core2_vcodec_clk 0x24fa20a3
 #define clk_mmss_debug_mux 0xe646ffda
+
+/* clock_mdss controlled clocks */
+#define clk_pclk0_clk_src 0xccac1f35
+#define clk_pclk1_clk_src 0x090f68ac
+#define clk_byte0_clk_src 0x75cc885b
+#define clk_byte1_clk_src 0x63c2c955
+#define clk_extpclk_clk_src 0xb2c31abd
+#define clk_mdss_byte0_clk 0xf5a03f64
+#define clk_mdss_byte1_clk 0xb8c7067d
+#define clk_mdss_extpclk_clk 0xfa5aadb0
+#define clk_mdss_pclk0_clk 0x3487234a
+#define clk_mdss_pclk1_clk 0xd5804246
+
+/* clock_cpu controlled clocks */
+#define clk_cci_clk 0x96854074
+#define clk_a53_clk 0x5c9f8836
+#define clk_a57_clk 0x6c7dc3ea
 
 /* clock_debug controlled clocks */
 #define clk_gcc_debug_mux 0x8121ac15
