@@ -223,6 +223,14 @@ static void handle_linkdown_func(struct work_struct *work)
 		PCIE_DBG("PCIe: Linkdown callback for RC%d\n", dev->rc_idx);
 		dev->event_reg->callback(notify);
 
+		if (dev->event_reg->options & MSM_PCIE_CONFIG_NO_RECOVERY) {
+			dev->user_suspend = true;
+			PCIE_DBG(
+				"PCIe: Client of RC%d will recover the link later.\n",
+				dev->rc_idx);
+			goto out;
+		}
+
 		if (dev->link_status == MSM_PCIE_LINK_DISABLED) {
 			PCIE_DBG(
 				"PCIe: Client of RC%d does not enable link in callback; so disable the link\n",
