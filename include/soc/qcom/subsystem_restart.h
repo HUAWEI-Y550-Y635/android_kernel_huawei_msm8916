@@ -44,6 +44,7 @@ struct module;
  * framework
  * @no_auth: Set if subsystem does not rely on PIL to authenticate and bring
  * it out of reset
+ * @ssctl_instance_id: Instance id used to connect with SSCTL service
  */
 struct subsys_desc {
 	const char *name;
@@ -67,6 +68,7 @@ struct subsys_desc {
 	int ramdump_disable_gpio;
 	int ramdump_disable;
 	bool no_auth;
+	int ssctl_instance_id;
 };
 
 /**
