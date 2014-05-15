@@ -36,7 +36,7 @@ config ARCH_MSM8974
 	select ENABLE_VMALLOC_SAVINGS
 	select MSM_IRQ
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V3
+	select PINCTRL_MSM_TLMM
 
 config ARCH_APQ8084
 	bool "APQ8084"
@@ -75,7 +75,7 @@ config ARCH_APQ8084
 	select MAXIMUM_CURRENT_THROTTLING
 	select MSM_IRQ
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V3
+	select PINCTRL_MSM_TLMM
 
 config ARCH_MPQ8092
 	bool "MPQ8092"
@@ -99,7 +99,7 @@ config ARCH_MPQ8092
 	select MSM_RPM_SMD
 	select REGULATOR_RPM_SMD
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V3
+	select PINCTRL_MSM_TLMM
 	select USB_ARCH_HAS_XHCI
 	select MSM_IRQ
 	select MSM_SPM_V2
@@ -191,7 +191,7 @@ config ARCH_MDM9630
 	select PM_DEVFREQ
 	select MSM_DEVFREQ_DEVBW
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V3
+	select PINCTRL_MSM_TLMM
 	select MSM_IRQ
 	select MSM_QDSP6_APRV2
 	select MSM_QDSP6V2_CODECS
@@ -249,7 +249,7 @@ config ARCH_MSM8610
 	select MSM_IOMMU_SYNC
 	select MSM_RPM_STATS_LOG
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V3
+	select PINCTRL_MSM_TLMM
 	select MSM_IRQ
 
 config ARCH_MSM8226
@@ -289,7 +289,7 @@ config ARCH_MSM8226
 	select MSM_RPM_STATS_LOG
 	select ARCH_WANT_KMAP_ATOMIC_FLUSH
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V3
+	select PINCTRL_MSM_TLMM
 	select ENABLE_VMALLOC_SAVINGS
 	select MSM_IRQ
 
@@ -319,7 +319,7 @@ config ARCH_MSMSAMARIUM
 	select ARCH_WANT_KMAP_ATOMIC_FLUSH
 	select QMI_ENCDEC
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V3
+	select PINCTRL_MSM_TLMM
 	select MSM_IRQ
 endmenu
 
