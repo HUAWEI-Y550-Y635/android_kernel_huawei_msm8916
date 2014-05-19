@@ -201,7 +201,6 @@ static void bam_data_free_skb_to_pool(
 	struct sk_buff *skb)
 {
 	struct bam_data_ch_info *d;
-	unsigned long flags;
 
 	if (!port) {
 		dev_kfree_skb_any(skb);
@@ -213,11 +212,9 @@ static void bam_data_free_skb_to_pool(
 		return;
 	}
 
-	spin_lock_irqsave(&port->port_lock_ul, flags);
 	skb->len = 0;
 	skb_reset_tail_pointer(skb);
 	__skb_queue_tail(&d->rx_skb_idle, skb);
-	spin_unlock_irqrestore(&port->port_lock_ul, flags);
 }
 
 static void bam_data_write_done(void *p, struct sk_buff *skb)
@@ -229,9 +226,9 @@ static void bam_data_write_done(void *p, struct sk_buff *skb)
 	if (!skb)
 		return;
 
+	spin_lock_irqsave(&port->port_lock_ul, flags);
 	bam_data_free_skb_to_pool(port, skb);
 
-	spin_lock_irqsave(&port->port_lock_ul, flags);
 	d->pending_with_bam--;
 
 	pr_debug("%s: port:%p d:%p pbam:%u, pno:%d\n", __func__,
@@ -307,10 +304,7 @@ static void bam_data_start_rx(struct bam_data_port *port)
 		ret = usb_ep_queue(ep, req, GFP_ATOMIC);
 		spin_lock_irqsave(&port->port_lock_ul, flags);
 		if (ret) {
-			spin_unlock_irqrestore(&port->port_lock_ul, flags);
 			bam_data_free_skb_to_pool(port, skb);
-			spin_lock_irqsave(&port->port_lock_ul, flags);
-
 
 			pr_err("%s: rx queue failed %d\n", __func__, ret);
 
@@ -332,6 +326,7 @@ static void bam_data_epout_complete(struct usb_ep *ep, struct usb_request *req)
 	struct sk_buff		*skb = req->context;
 	int			status = req->status;
 	int			queue = 0;
+	unsigned long		flags;
 
 	switch (status) {
 	case 0:
@@ -341,14 +336,18 @@ static void bam_data_epout_complete(struct usb_ep *ep, struct usb_request *req)
 	case -ECONNRESET:
 	case -ESHUTDOWN:
 		/* cable disconnection */
+		spin_lock_irqsave(&port->port_lock_ul, flags);
 		bam_data_free_skb_to_pool(port, skb);
+		spin_unlock_irqrestore(&port->port_lock_ul, flags);
 		req->buf = 0;
 		usb_ep_free_request(ep, req);
 		return;
 	default:
 		pr_err("%s: %s response error %d, %d/%d\n", __func__,
 			ep->name, status, req->actual, req->length);
+		spin_lock_irqsave(&port->port_lock_ul, flags);
 		bam_data_free_skb_to_pool(port, skb);
+		spin_unlock_irqrestore(&port->port_lock_ul, flags);
 		break;
 	}
 
