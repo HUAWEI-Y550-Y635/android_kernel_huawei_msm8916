@@ -744,6 +744,8 @@ static int msm_bus_fabric_init(struct device *dev,
 	fabdev->qos_freq = pdata->fabdev->qos_freq;
 	fabdev->bus_type = pdata->fabdev->bus_type;
 	fabdev->bypass_qos_prg = pdata->fabdev->bypass_qos_prg;
+	fabdev->util_fact = pdata->fabdev->util_fact;
+	fabdev->vrail_comp = pdata->fabdev->vrail_comp;
 	msm_bus_fab_init_noc_ops(node_dev);
 
 	fabdev->qos_base = devm_ioremap(dev,
