@@ -64,6 +64,7 @@ static DEFINE_VDD_REGULATORS(vdd_dig, VDD_DIG_NUM, 1, vdd_corner, NULL);
 #define C0_PLL_USER_CTL   0x10
 #define C0_PLL_CONFIG_CTL 0x14
 #define C0_PLL_STATUS     0x1C
+#define C0_PLL_TEST_CTL_LO 0x20
 
 #define C0_PLLA_MODE       0x40
 #define C0_PLLA_L_VAL      0x44
@@ -71,6 +72,7 @@ static DEFINE_VDD_REGULATORS(vdd_dig, VDD_DIG_NUM, 1, vdd_corner, NULL);
 #define C0_PLLA_USER_CTL   0x50
 #define C0_PLLA_CONFIG_CTL 0x54
 #define C0_PLLA_STATUS     0x5C
+#define C0_PLLA_TEST_CTL_LO 0x60
 
 #define C1_PLL_MODE        0x0
 #define C1_PLL_L_VAL       0x4
@@ -78,6 +80,7 @@ static DEFINE_VDD_REGULATORS(vdd_dig, VDD_DIG_NUM, 1, vdd_corner, NULL);
 #define C1_PLL_USER_CTL   0x10
 #define C1_PLL_CONFIG_CTL 0x14
 #define C1_PLL_STATUS     0x1C
+#define C1_PLL_TEST_CTL_LO 0x20
 
 #define C1_PLLA_MODE       0x40
 #define C1_PLLA_L_VAL      0x44
@@ -85,6 +88,7 @@ static DEFINE_VDD_REGULATORS(vdd_dig, VDD_DIG_NUM, 1, vdd_corner, NULL);
 #define C1_PLLA_USER_CTL   0x50
 #define C1_PLLA_CONFIG_CTL 0x54
 #define C1_PLLA_STATUS     0x5C
+#define C1_PLLA_TEST_CTL_LO 0x60
 
 #define GLB_CLK_DIAG	0x1C
 #define MUX_OFFSET	0x54
@@ -151,23 +155,25 @@ static struct pll_clk a57_pll0 = {
 	.alpha_reg = (void __iomem *)C1_PLL_ALPHA,
 	.config_reg = (void __iomem *)C1_PLL_USER_CTL,
 	.config_ctl_reg = (void __iomem *)C1_PLL_CONFIG_CTL,
-	.status_reg = (void __iomem *)C1_PLL_STATUS,
+	.status_reg = (void __iomem *)C1_PLL_MODE,
+	.test_ctl_lo_reg = (void __iomem *)C1_PLL_TEST_CTL_LO,
 	.masks = {
 		.pre_div_mask = BIT(12),
 		.post_div_mask = BM(9, 8),
 		.mn_en_mask = BIT(24),
 		.main_output_mask = BIT(0),
 		.early_output_mask = BIT(3),
+		.apc_pdn_mask = BIT(24),
+		.lock_mask = BIT(31),
 	},
 	.vals = {
-		.post_div_masked = 0x300,
+		.post_div_masked = 0x100,
 		.pre_div_masked = 0x0,
 		.config_ctl_val = 0x000D6968,
+		.test_ctl_lo_val = 0x00010000,
 	},
 	.min_rate = 1209600000,
 	.max_rate = 1996800000,
-	/* FIXME: Simulation hack */
-	.inited = true,
 	.base = &vbases[C1_PLL_BASE],
 	.c = {
 		.parent = &xo_ao.c,
@@ -184,25 +190,27 @@ static struct pll_clk a57_pll1 = {
 	.alpha_reg = (void __iomem *)C1_PLLA_ALPHA,
 	.config_reg = (void __iomem *)C1_PLLA_USER_CTL,
 	.config_ctl_reg = (void __iomem *)C1_PLLA_CONFIG_CTL,
-	.status_reg = (void __iomem *)C1_PLLA_STATUS,
+	.status_reg = (void __iomem *)C1_PLLA_MODE,
+	.test_ctl_lo_reg = (void __iomem *)C1_PLLA_TEST_CTL_LO,
 	.masks = {
 		.pre_div_mask = BIT(12),
 		.post_div_mask = BM(9, 8),
 		.mn_en_mask = BIT(24),
 		.main_output_mask = BIT(0),
 		.early_output_mask = BIT(3),
+		.apc_pdn_mask = BIT(24),
+		.lock_mask = BIT(31),
 	},
 	.vals = {
 		.post_div_masked = 0x300,
 		.pre_div_masked = 0x0,
 		.config_ctl_val = 0x000D6968,
+		.test_ctl_lo_val = 0x00010000,
 	},
 	/* Necessary since we'll be setting a rate before handoff on V1 */
 	.src_rate = 19200000,
 	.min_rate = 1209600000,
 	.max_rate = 1996800000,
-	/* FIXME: Simulation hack */
-	.inited = true,
 	.base = &vbases[C1_PLL_BASE],
 	.c = {
 		.parent = &xo_ao.c,
@@ -219,23 +227,25 @@ static struct pll_clk a53_pll0 = {
 	.alpha_reg = (void __iomem *)C0_PLL_ALPHA,
 	.config_reg = (void __iomem *)C0_PLL_USER_CTL,
 	.config_ctl_reg = (void __iomem *)C0_PLL_CONFIG_CTL,
-	.status_reg = (void __iomem *)C0_PLL_STATUS,
+	.status_reg = (void __iomem *)C0_PLL_MODE,
+	.test_ctl_lo_reg = (void __iomem *)C0_PLL_TEST_CTL_LO,
 	.masks = {
 		.pre_div_mask = BIT(12),
 		.post_div_mask = BM(9, 8),
 		.mn_en_mask = BIT(24),
 		.main_output_mask = BIT(0),
 		.early_output_mask = BIT(3),
+		.apc_pdn_mask = BIT(24),
+		.lock_mask = BIT(31),
 	},
 	.vals = {
-		.post_div_masked = 0x300,
+		.post_div_masked = 0x100,
 		.pre_div_masked = 0x0,
 		.config_ctl_val = 0x000D6968,
+		.test_ctl_lo_val = 0x00010000,
 	},
 	.min_rate = 1209600000,
 	.max_rate = 1996800000,
-	/* FIXME: Simulation hack */
-	.inited = true,
 	.base = &vbases[C0_PLL_BASE],
 	.c = {
 		.parent = &xo_ao.c,
@@ -252,25 +262,27 @@ static struct pll_clk a53_pll1 = {
 	.alpha_reg = (void __iomem *)C0_PLLA_ALPHA,
 	.config_reg = (void __iomem *)C0_PLLA_USER_CTL,
 	.config_ctl_reg = (void __iomem *)C0_PLLA_CONFIG_CTL,
-	.status_reg = (void __iomem *)C0_PLLA_STATUS,
+	.status_reg = (void __iomem *)C0_PLLA_MODE,
+	.test_ctl_lo_reg = (void __iomem *)C0_PLLA_TEST_CTL_LO,
 	.masks = {
 		.pre_div_mask = BIT(12),
 		.post_div_mask = BM(9, 8),
 		.mn_en_mask = BIT(24),
 		.main_output_mask = BIT(0),
 		.early_output_mask = BIT(3),
+		.apc_pdn_mask = BIT(24),
+		.lock_mask = BIT(31),
 	},
 	.vals = {
 		.post_div_masked = 0x300,
 		.pre_div_masked = 0x0,
 		.config_ctl_val = 0x000D6968,
+		.test_ctl_lo_val = 0x00010000,
 	},
 	/* Necessary since we'll be setting a rate before handoff on V1 */
 	.src_rate = 19200000,
 	.min_rate = 1209600000,
 	.max_rate = 1996800000,
-	/* FIXME: Simulation hack */
-	.inited = true,
 	.base = &vbases[C0_PLL_BASE],
 	.c = {
 		.parent = &xo_ao.c,
@@ -283,19 +295,11 @@ static struct pll_clk a53_pll1 = {
 
 static DEFINE_SPINLOCK(mux_reg_lock);
 
-#define SCM_IO_READ	0x1
-#define SCM_IO_WRITE	0x2
-
 static int cpudiv_get_div(struct div_clk *divclk)
 {
 	u32 regval;
 
-	if (divclk->priv)
-		regval = scm_call_atomic1(SCM_SVC_IO, SCM_IO_READ,
-					 *(u32 *)divclk->priv + divclk->offset);
-	else
-		regval = readl_relaxed(*divclk->base + divclk->offset);
-
+	regval = readl_relaxed(*divclk->base + divclk->offset);
 	regval &= (divclk->mask << divclk->shift);
 	regval >>= divclk->shift;
 
@@ -308,23 +312,10 @@ static void __cpudiv_set_div(struct div_clk *divclk, int div)
 	unsigned long flags;
 
 	spin_lock_irqsave(&mux_reg_lock, flags);
-
-	if (divclk->priv)
-		regval = scm_call_atomic1(SCM_SVC_IO, SCM_IO_READ,
-					 *(u32 *)divclk->priv + divclk->offset);
-	else
-		regval = readl_relaxed(*divclk->base + divclk->offset);
-
-
+	regval = readl_relaxed(*divclk->base + divclk->offset);
 	regval &= ~(divclk->mask << divclk->shift);
 	regval |= ((div - 1) & divclk->mask) << divclk->shift;
-
-	if (divclk->priv)
-		scm_call_atomic2(SCM_SVC_IO, SCM_IO_WRITE,
-				 *(u32 *)divclk->priv + divclk->offset, regval);
-	else
-		writel_relaxed(regval, *divclk->base + divclk->offset);
-
+	writel_relaxed(regval, *divclk->base + divclk->offset);
 	/* Ensure switch request goes through before returning */
 	mb();
 	spin_unlock_irqrestore(&mux_reg_lock, flags);
@@ -407,6 +398,9 @@ static struct mux_clk a53_lf_mux;
 static struct mux_clk a53_hf_mux;
 static struct mux_clk a57_lf_mux;
 static struct mux_clk a57_hf_mux;
+
+#define SCM_IO_READ	0x1
+#define SCM_IO_WRITE	0x2
 
 static void __cpu_mux_set_sel(struct mux_clk *mux, int sel)
 {
@@ -724,6 +718,7 @@ static struct alpha_pll_masks alpha_pll_masks_20nm_p = {
 	.vco_mask = BM(21, 20) >> 20,
 	.vco_shift = 20,
 	.alpha_en_mask = BIT(24),
+	.output_mask = 0xF,
 };
 
 static struct alpha_pll_vco_tbl alpha_pll_vco_20nm_p[] = {
@@ -735,6 +730,7 @@ static struct alpha_pll_clk cci_pll = {
 	.base = &vbases[CCI_PLL_BASE],
 	.vco_tbl = alpha_pll_vco_20nm_p,
 	.num_vco = ARRAY_SIZE(alpha_pll_vco_20nm_p),
+	.enable_config = 0x9, /* Main and early outputs */
 	.c = {
 		.parent = &xo_ao.c,
 		.dbg_name = "cci_pll",
@@ -789,6 +785,8 @@ static struct mux_clk cci_hf_mux = {
 	},
 };
 
+DEFINE_VDD_REGS_INIT(vdd_cci, 1);
+
 static struct div_clk cci_clk = {
 	.data = {
 		.min_div = 1,
@@ -800,9 +798,9 @@ static struct div_clk cci_clk = {
 	.offset = CCI_MUX_OFFSET,
 	.mask = 0x3,
 	.shift = 5,
-	.priv = &cci_phys_base,
 	.c = {
 		.parent = &cci_hf_mux.c,
+		.vdd_class = &vdd_cci,
 		.dbg_name = "cci_clk",
 		.ops = &clk_ops_div,
 		CLK_INIT(cci_clk.c),
@@ -940,6 +938,13 @@ static int cpu_clock_8994_resources_init(struct platform_device *pdev)
 		return PTR_ERR(vdd_a57.regulator[0]);
 	}
 
+	vdd_cci.regulator[0] = devm_regulator_get(&pdev->dev, "vdd-cci");
+	if (IS_ERR(vdd_cci.regulator[0])) {
+		if (PTR_ERR(vdd_cci.regulator[0]) != -EPROBE_DEFER)
+			dev_err(&pdev->dev, "Unable to get the cci vreg\n");
+		return PTR_ERR(vdd_cci.regulator[0]);
+	}
+
 	c = devm_clk_get(&pdev->dev, "xo_ao");
 	if (IS_ERR(c)) {
 		if (PTR_ERR(c) != -EPROBE_DEFER)
@@ -973,57 +978,21 @@ static void perform_v1_fixup(void)
 	 * 3. Configure the PLL to generate 1.5936 GHz.
 	 */
 	a53_pll1.c.ops->disable(&a53_pll1.c);
-	a57_pll1.c.ops->disable(&a57_pll1.c);
 
 	/* Set the divider on the PLL1 input to the A53 LF MUX (div 2) */
 	regval = readl_relaxed(vbases[ALIAS0_GLB_BASE] + MUX_OFFSET);
 	regval |= BIT(6);
 	writel_relaxed(regval, vbases[ALIAS0_GLB_BASE] + MUX_OFFSET);
 
-	/* Set the divider on the PLL1 input to the A57 LF MUX (div 2) */
-	regval = readl_relaxed(vbases[ALIAS1_GLB_BASE] + MUX_OFFSET);
-	regval |= BIT(6);
-	writel_relaxed(regval, vbases[ALIAS1_GLB_BASE] + MUX_OFFSET);
-
-	/* Set the main/aux output divider on the A53 secondary PLL to 4 */
-	regval = readl_relaxed(vbases[C0_PLL_BASE] + C0_PLLA_USER_CTL);
-	regval &= ~BM(9, 8);
-	regval |= (0x3 << 8);
-	writel_relaxed(regval, vbases[C0_PLL_BASE] + C0_PLLA_USER_CTL);
-
-	/* Set the main/aux output divider on the A57 secondary PLL to 4 */
-	regval = readl_relaxed(vbases[C1_PLL_BASE] + C1_PLLA_USER_CTL);
-	regval &= ~BM(9, 8);
-	regval |= (0x3 << 8);
-	writel_relaxed(regval, vbases[C1_PLL_BASE] + C1_PLLA_USER_CTL);
-
-	/* FIXME:Simulation hack */
-	/* Set the main/aux output divider on the A53 primary PLL to 2 */
-	regval = readl_relaxed(vbases[C0_PLL_BASE] + C0_PLL_USER_CTL);
-	regval &= ~BM(9, 8);
-	regval |= (0x1 << 8);
-	writel_relaxed(regval, vbases[C0_PLL_BASE] + C0_PLL_USER_CTL);
-
-	/* FIXME:Simulation hack */
-	/* Set the main/aux output divider on the A57 primary PLL to 2 */
-	regval = readl_relaxed(vbases[C1_PLL_BASE] + C1_PLL_USER_CTL);
-	regval &= ~BM(9, 8);
-	regval |= (0x1 << 8);
-	writel_relaxed(regval, vbases[C1_PLL_BASE] + C1_PLL_USER_CTL);
-
 	a53_pll1.c.ops->set_rate(&a53_pll1.c, 1593600000);
-	a57_pll1.c.ops->set_rate(&a57_pll1.c, 1593600000);
 
 	a53_pll1.c.rate = 1593600000;
-	a57_pll1.c.rate = 1593600000;
 
-	/* Enable the A53 and A57 secondary PLLs */
+	/* Enable the A53 secondary PLL */
 	a53_pll1.c.ops->enable(&a53_pll1.c);
-	a57_pll1.c.ops->enable(&a57_pll1.c);
 
-	/* Select the "safe" parent on the secondary muxes */
+	/* Select the "safe" parent on the secondary mux */
 	__cpu_mux_set_sel(&a53_lf_mux, 1);
-	__cpu_mux_set_sel(&a57_lf_mux, 1);
 }
 
 static int cpu_clock_8994_driver_probe(struct platform_device *pdev)
@@ -1049,6 +1018,12 @@ static int cpu_clock_8994_driver_probe(struct platform_device *pdev)
 	ret = of_get_fmax_vdd_class(pdev, &a57_clk.c, "qcom,a57-speedbin0-v0");
 	if (ret) {
 		dev_err(&pdev->dev, "Can't get speed bin for a57\n");
+		return ret;
+	}
+
+	ret = of_get_fmax_vdd_class(pdev, &cci_clk.c, "qcom,cci-speedbin0-v0");
+	if (ret) {
+		dev_err(&pdev->dev, "Can't get speed bin for cci\n");
 		return ret;
 	}
 
@@ -1142,6 +1117,79 @@ static void __exit cpu_clock_8994_exit(void)
 	platform_driver_unregister(&cpu_clock_8994_driver);
 }
 module_exit(cpu_clock_8994_exit);
+
+#define ALIAS1_GLB_BASE_PHY 0xF900F000
+#define C1_PLL_BASE_PHY 0xF9016000
+
+/* Setup the A57 clocks before _this_ driver probes, before smp_init */
+int __init cpu_clock_8994_init_a57(void)
+{
+	u32 regval;
+	int xo_sel, lfmux_sel, safe_sel;
+	struct device_node *ofnode = of_find_compatible_node(NULL, NULL,
+							"qcom,cpu-clock-8994");
+	if (!ofnode)
+		return 0;
+
+	/*
+	 * One time configuration message. This is extremely important to know
+	 * if the boot-time configuration has't hung the CPU(s).
+	 */
+	pr_info("clock-cpu-8994: configuring clocks for the A57 cluster\n");
+
+	vbases[ALIAS1_GLB_BASE] = ioremap(ALIAS1_GLB_BASE_PHY, SZ_4K);
+	if (!vbases[ALIAS1_GLB_BASE]) {
+		WARN(1, "Unable to ioremap A57 mux base. Can't configure A57 clocks.\n");
+		return -ENOMEM;
+	}
+
+	vbases[C1_PLL_BASE] = ioremap(C1_PLL_BASE_PHY, SZ_4K);
+	if (!vbases[C1_PLL_BASE]) {
+		WARN(1, "Unable to ioremap A57 pll base. Can't configure A57 clocks.\n");
+		return -ENOMEM;
+	}
+
+	xo_sel = parent_to_src_sel(a57_lf_mux.parents, a57_lf_mux.num_parents,
+				   &xo_ao.c);
+	lfmux_sel = parent_to_src_sel(a57_hf_mux.parents,
+					a57_hf_mux.num_parents, &a57_lf_mux.c);
+	safe_sel = parent_to_src_sel(a57_lf_mux.parents, a57_lf_mux.num_parents,
+					&a57_safe_clk.c);
+
+	__cpu_mux_set_sel(&a57_lf_mux, xo_sel);
+	__cpu_mux_set_sel(&a57_hf_mux, lfmux_sel);
+
+	a57_pll1.c.ops->disable(&a57_pll1.c);
+
+	/* Set the main/aux output divider on the A57 primary PLL to 4 */
+	regval = readl_relaxed(vbases[C1_PLL_BASE] + C1_PLLA_USER_CTL);
+	regval &= ~BM(9, 8);
+	regval |= (0x3 << 8);
+	writel_relaxed(regval, vbases[C1_PLL_BASE] + C1_PLLA_USER_CTL);
+
+	a57_pll1.c.ops->set_rate(&a57_pll1.c, 1593600000);
+
+	/* Set the divider on the PLL1 input to the A57 LF MUX (div 2) */
+	regval = readl_relaxed(vbases[ALIAS1_GLB_BASE] + MUX_OFFSET);
+	regval |= BIT(6);
+	writel_relaxed(regval, vbases[ALIAS1_GLB_BASE] + MUX_OFFSET);
+
+	a57_pll1.c.ops->enable(&a57_pll1.c);
+
+	__cpu_mux_set_sel(&a57_lf_mux, safe_sel);
+
+	/* Set the cached mux selections to match what was programmed above. */
+	a57_lf_mux.en_mask = safe_sel;
+	a57_hf_mux.en_mask = lfmux_sel;
+
+	iounmap(vbases[ALIAS1_GLB_BASE]);
+	iounmap(vbases[C1_PLL_BASE]);
+
+	pr_cont("clock-cpu-8994: finished configuring A57 cluster clocks.\n");
+
+	return 0;
+}
+early_initcall(cpu_clock_8994_init_a57);
 
 MODULE_DESCRIPTION("CPU clock driver for 8994");
 MODULE_LICENSE("GPL v2");
