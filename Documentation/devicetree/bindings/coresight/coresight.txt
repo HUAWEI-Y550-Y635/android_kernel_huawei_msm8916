@@ -16,6 +16,9 @@ Required properties:
 	"arm,coresight-tpiu" for coresight tpiu device,
 	"qcom,coresight-replicator" for coresight replicator device,
 	"arm,coresight-funnel" for coresight funnel devices,
+	"qcom,coresight-tpda" for coresight tpda device,
+	"qcom,coresight-tpdm" for coresight tpdm device,
+	"qcom,coresight-dbgui" for coresight dbgui device
 	"arm,coresight-stm" for coresight stm trace device,
 	"arm,coresight-etm" for coresight etm trace devices,
 	"arm,coresight-etmv4" for coresight etmv4 trace devices,
@@ -62,6 +65,18 @@ Required properties:
 		compatible : should be "arm,coresight-funnel"
 		reg-names  : should be:
 			"funnel-base" - physical base address of funnel registers
+	- for coresight tpda trace device
+		compatible : should be "qcom,coresight-tpda"
+		reg-names  : should be:
+			"tpda-base" - physical base address of tpda registers
+	- for coresight tpdm trace device
+		compatible : should be "qcom,coresight-tpdm"
+		reg-names  : should be:
+			"tpdm-base" - physical base address of tpdm registers
+	- for coresight dbgui device:
+		compatible : should be "qcom,coresight-dbgui"
+		reg-names  : should be:
+			"dbgui-base" - physical base address of dbgui registers
 	- for coresight stm trace device
 		compatible : should be "arm,coresight-stm"
 		reg-names  : should be:
@@ -104,6 +119,10 @@ Required properties:
 - coresight-name : unique descriptive name of the component
 - coresight-nr-inports : number of input ports on the component
 - coresight-cti-cpu : cpu phandle for cpu cti, required when qcom,cti-save is true
+- coresight-etm-cpu : specifies phandle for the cpu associated with the ETM device
+- qcom,dbgui-addr-offset : indicates the offset of dbgui address registers
+- qcom,dbgui-data-offset : indicates the offset of dbgui data registers
+- qcom,dbgui-size : indicates the size of dbgui address and data registers
 
 coresight-outports, coresight-child-list and coresight-child-ports lists will
 be of the same length and will have a one to one correspondence among the
@@ -146,6 +165,7 @@ Optional properties:
 				SD card vdd supply or "vdd-io" for SD I/O vdd
 				supply.
 - qcom,hwevent-clks : list of clocks required by hardware event driver
+- qcom,hwevent-regs : list of regulators required by hardware event driver
 - qcom,byte-cntr-absent : specifies if the byte counter feature is absent on
 			  the device. Only relevant in case of tmc-etr device.
 - interrupts : <a b c> where a is 0 or 1 depending on if the interrupt is
@@ -175,7 +195,15 @@ Optional properties:
 		  cti-trigout-pctrl. Used for cti component
 - pinctrl-<n>: list of pinctrl phandles for the different pinctrl states. Refer
 	       to "Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt".
-
+-qcom,funnel-save-restore : boolean, indicating funnel port needs to be disabled
+			    for the ETM whose CPU is being powered down. The port
+			    state is restored when CPU is powered up. Used for
+			    funnel component.
+-qcom,tmc-flush-powerdown : boolean, indicating trace data needs to be flushed before
+			    powering down CPU. Used for TMC component.
+-qcom,cmb-elem-size: specifies the CMB element size supported by each monitor
+		     connected to the aggregator on each port. Should be specified
+		     in pairs (port, cmb element size).
 Examples:
 
 1. Sinks
@@ -244,7 +272,63 @@ Examples:
 		coresight-child-ports = <0>;
 	};
 
+	tpda_lmh: tpda@fbb91000 {
+		compatible = "qcom,coresight-tpda";
+		reg = <0xfbb91000x1000>;
+		reg-names = "tpda-base";
+
+		coresight-id = <7>;
+		coresight-name = "coresight-tpda-lmh";
+		coresight-nr-inports = <32>;
+		coresight-outports = <0>;
+		coresight-child-list = <&funnel_in0>;
+		coresight-child-ports = <4>;
+		qcom,cmb-elem-size = <0 64>;
+
+		clocks = <&clock_rpm clk_qdss_clk>,
+			 <&clock_rpm clk_qdss_a_clk>;
+		clock-names = "core_clk", "core_a_clk";
+	};
+
 3. Sources
+	tpdm_lmh: tpdm@fbb90000 {
+		compatible = "qcom,coresight-tpdm";
+		reg = <0xfbb90000x1000>;
+		reg-names = "tpdm-base";
+
+		coresight-id = <8>;
+		coresight-name = "coresight-tpdm-lmh";
+		coresight-nr-inports = <0>;
+		coresight-outports = <0>;
+		coresight-child-list = <&tpda_lmh>;
+		coresight-child-ports = <0>;
+
+		clocks = <&clock_rpm clk_qdss_clk>,
+			 <&clock_rpm clk_qdss_a_clk>;
+		clock-names = "core_clk", "core_a_clk";
+	};
+
+	dbgui: dbgui@86d000 {
+		compatible = "qcom,coresight-dbgui";
+		reg = <0x86d000 0x1000>;
+		reg-names = "dbgui-base";
+
+		coresight-id = <11>;
+		coresight-name = "coresight-dbgui";
+		coresight-nr-inports = <0>;
+		coresight-outports = <0>;
+		coresight-child-list = <&funnel_in3>;
+		coresight-child-ports = <2>;
+
+		qcom,dbgui-addr-offset = <0x30>;
+		qcom,dbgui-data-offset = <0xB0>;
+		qcom,dbgui-size = <32>;
+
+		clocks = <&clock_rpm clk_qdss_clk>,
+			 <&clock_rpm clk_qdss_a_clk>;
+		clock-names = "core_clk", "core_a_clk";
+	};
+
 	stm: stm@fc321000 {
 		compatible = "arm,coresight-stm";
 		reg = <0xfc321000 0x1000>,
@@ -270,6 +354,8 @@ Examples:
 		coresight-outports = <0>;
 		coresight-child-list = <&funnel_kpss>;
 		coresight-child-ports = <0>;
+		coresight-etm-cpu = <&CPU0>;
+
 		qcom,pc-save;
 		qcom,round-robin;
 	};
@@ -312,6 +398,7 @@ Examples:
 		coresight-nr-inports = <0>;
 
 		qcom,hwevent-clks = "core_mmss_clk";
+		qcom,hwevent-regs = "gdsc_ufs";
 	};
 
 	fuse: fuse@fc4be024 {
