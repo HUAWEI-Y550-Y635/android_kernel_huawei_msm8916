@@ -207,9 +207,10 @@ static int msm_ispif_reset_hw(struct ispif_device *ispif)
 }
 
 int msm_ispif_get_ahb_clk_info(struct ispif_device *ispif_dev,
-	struct platform_device *pdev)
+	struct platform_device *pdev,
+	struct msm_cam_clk_info *ahb_clk_info)
 {
-	uint32_t count;
+	uint32_t count, num_ahb_clk = 0;
 	int i, rc;
 	uint32_t rates[ISPIF_CLK_INFO_MAX];
 
@@ -224,23 +225,12 @@ int msm_ispif_get_ahb_clk_info(struct ispif_device *ispif_dev,
 		return 0;
 	}
 
-	count = ISPIF_AHB_CLK_INFO;
 	if (count > ISPIF_CLK_INFO_MAX) {
 		pr_err("invalid count=%d, max is %d\n", count,
 			ISPIF_CLK_INFO_MAX);
 		return -EINVAL;
 	}
 
-	for (i = 0; i < count; i++) {
-		rc = of_property_read_string_index(of_node, "clock-names",
-				i, &(ispif_8974_ahb_clk_info[i].clk_name));
-		CDBG("clock-names[%d] = %s\n",
-			 i, ispif_8974_ahb_clk_info[i].clk_name);
-		if (rc < 0) {
-			pr_err("%s failed %d\n", __func__, __LINE__);
-			return rc;
-		}
-	}
 	rc = of_property_read_u32_array(of_node, "qcom,clock-rates",
 		rates, count);
 	if (rc < 0) {
@@ -248,12 +238,24 @@ int msm_ispif_get_ahb_clk_info(struct ispif_device *ispif_dev,
 		return rc;
 	}
 	for (i = 0; i < count; i++) {
-		ispif_8974_ahb_clk_info[i].clk_rate =
-			 (rates[i] == 0) ? -1 : rates[i];
-		CDBG("clk_rate[%d] = %ld\n", i,
-			 ispif_8974_ahb_clk_info[i].clk_rate);
+		rc = of_property_read_string_index(of_node, "clock-names",
+				i, &(ahb_clk_info[num_ahb_clk].clk_name));
+		CDBG("clock-names[%d] = %s\n",
+			 i, ahb_clk_info[i].clk_name);
+		if (rc < 0) {
+			pr_err("%s failed %d\n", __func__, __LINE__);
+			return rc;
+		}
+		if (strnstr(ahb_clk_info[num_ahb_clk].clk_name, "ahb",
+			sizeof(ahb_clk_info[num_ahb_clk].clk_name))) {
+			ahb_clk_info[num_ahb_clk].clk_rate =
+				(rates[i] == 0) ? (long)-1 : rates[i];
+			CDBG("clk_rate[%d] = %ld\n", i,
+				ahb_clk_info[i].clk_rate);
+			num_ahb_clk++;
+		}
 	}
-	ispif_dev->num_clk = count;
+	ispif_dev->num_ahb_clk = num_ahb_clk;
 	return 0;
 }
 
@@ -266,7 +268,8 @@ static int msm_ispif_clk_ahb_enable(struct ispif_device *ispif, int enable)
 		return 0;
 	}
 
-	rc = msm_ispif_get_ahb_clk_info(ispif, ispif->pdev);
+	rc = msm_ispif_get_ahb_clk_info(ispif, ispif->pdev,
+		ispif_8974_ahb_clk_info);
 	if (rc < 0) {
 		pr_err("%s: msm_isp_get_clk_info() failed", __func__);
 			return -EFAULT;
@@ -274,7 +277,7 @@ static int msm_ispif_clk_ahb_enable(struct ispif_device *ispif, int enable)
 
 	rc = msm_cam_clk_enable(&ispif->pdev->dev,
 		ispif_8974_ahb_clk_info, ispif->ahb_clk,
-		ispif->num_clk, enable);
+		ispif->num_ahb_clk, enable);
 	if (rc < 0) {
 		pr_err("%s: cannot enable clock, error = %d",
 			__func__, rc);
@@ -1152,14 +1155,6 @@ static struct v4l2_file_operations msm_ispif_v4l2_subdev_fops;
 static long msm_ispif_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
 {
-#ifdef CONFIG_COMPAT
-	void __user *up;
-	if (is_compat_task()) {
-		up = (void __user *)compat_ptr((unsigned long)arg);
-		arg = up;
-	}
-#endif
-
 	switch (cmd) {
 	case VIDIOC_MSM_ISPIF_CFG:
 		return msm_ispif_cmd(sd, arg);
@@ -1324,7 +1319,7 @@ static int ispif_probe(struct platform_device *pdev)
 #ifdef CONFIG_COMPAT
 	msm_ispif_v4l2_subdev_fops.compat_ioctl32 = msm_ispif_subdev_fops_ioctl;
 #endif
-
+	ispif->msm_sd.sd.devnode->fops = &msm_ispif_v4l2_subdev_fops;
 	ispif->pdev = pdev;
 	ispif->ispif_state = ISPIF_POWER_DOWN;
 	ispif->open_cnt = 0;
