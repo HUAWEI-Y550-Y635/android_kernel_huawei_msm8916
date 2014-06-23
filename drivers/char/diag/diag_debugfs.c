@@ -128,6 +128,9 @@ static ssize_t diag_dbgfs_read_status(struct file *file, char __user *ubuf,
 		"Received Feature mask from Modem: %d\n"
 		"Received Feature mask from LPASS: %d\n"
 		"Received Feature mask from WCNSS: %d\n"
+		"Mask Centralization Support on Modem: %d\n"
+		"Mask Centralization Support on LPASS: %d\n"
+		"Mask Centralization Support on WCNSS: %d\n"
 		"logging_mode: %d\n"
 #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
 		"mixed_qxdmlog: %d\n"
@@ -219,6 +222,9 @@ static ssize_t diag_dbgfs_read_status(struct file *file, char __user *ubuf,
 		driver->rcvd_feature_mask[MODEM_DATA],
 		driver->rcvd_feature_mask[LPASS_DATA],
 		driver->rcvd_feature_mask[WCNSS_DATA],
+		driver->mask_centralization[MODEM_DATA],
+		driver->mask_centralization[LPASS_DATA],
+		driver->mask_centralization[WCNSS_DATA],
 		driver->logging_mode,
 #ifdef CONFIG_HUAWEI_FEATURE_DIAG_MDLOG
 		driver->mixed_qmdlog_flag,
