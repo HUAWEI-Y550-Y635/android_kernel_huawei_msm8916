@@ -70,6 +70,13 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	mdp5_data = mfd_to_mdp5_data(pstatus_data->mfd);
 	ctl = mfd_to_ctl(pstatus_data->mfd);
 
+	if (!ctl->power_on) {
+		schedule_delayed_work(&pstatus_data->check_status,
+			msecs_to_jiffies(interval));
+		pr_err("%s: ctl not powered on\n", __func__);
+		return;
+	}
+
 	mutex_lock(&ctrl_pdata->mutex);
 	if (ctl->shared_lock)
 		mutex_lock(ctl->shared_lock);
