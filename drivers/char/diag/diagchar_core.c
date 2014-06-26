@@ -1425,6 +1425,7 @@ static ssize_t diagchar_read(struct file *file, char __user *buf, size_t count,
 	int copy_dci_data = 0;
 	int exit_stat;
 	int copy_data = 0;
+	int write_len = 0;
 	unsigned long flags;
 
 	for (i = 0; i < driver->num_clients; i++)
@@ -1653,9 +1654,10 @@ drop:
 	if (driver->data_ready[index] & MSG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & MSG_MASKS_TYPE;
-		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
-		COPY_USER_SPACE_OR_EXIT(buf+4, *(driver->msg_masks),
-							 MSG_MASK_SIZE);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, sizeof(int));
+		write_len = diag_copy_to_user_msg_mask(buf + ret, count);
+		if (write_len > 0)
+			ret += write_len;
 		driver->data_ready[index] ^= MSG_MASKS_TYPE;
 		goto exit;
 	}
@@ -1664,8 +1666,8 @@ drop:
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & EVENT_MASKS_TYPE;
 		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
-		COPY_USER_SPACE_OR_EXIT(buf+4, *(driver->event_masks),
-							 EVENT_MASK_SIZE);
+		COPY_USER_SPACE_OR_EXIT(buf+4, *(event_mask.ptr),
+					event_mask.mask_len);
 		driver->data_ready[index] ^= EVENT_MASKS_TYPE;
 		goto exit;
 	}
@@ -1673,9 +1675,10 @@ drop:
 	if (driver->data_ready[index] & LOG_MASKS_TYPE) {
 		/*Copy the type of data being passed*/
 		data_type = driver->data_ready[index] & LOG_MASKS_TYPE;
-		COPY_USER_SPACE_OR_EXIT(buf, data_type, 4);
-		COPY_USER_SPACE_OR_EXIT(buf+4, *(driver->log_masks),
-							 LOG_MASK_SIZE);
+		COPY_USER_SPACE_OR_EXIT(buf, data_type, sizeof(int));
+		write_len = diag_copy_to_user_log_mask(buf + ret, count);
+		if (write_len > 0)
+			ret += write_len;
 		driver->data_ready[index] ^= LOG_MASKS_TYPE;
 		goto exit;
 	}
