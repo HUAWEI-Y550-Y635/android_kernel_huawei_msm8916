@@ -1874,13 +1874,14 @@ static void mdss_mdp_overlay_pan_display(struct msm_fb_data_type *mfd)
 	struct mdss_mdp_pipe *pipe;
 	struct fb_info *fbi;
 	struct mdss_overlay_private *mdp5_data;
-	struct mdss_data_type *mdata = mfd_to_mdata(mfd);
+	struct mdss_data_type *mdata;
 	u32 offset;
 	int bpp, ret;
 
 	if (!mfd)
 		return;
 
+	mdata = mfd_to_mdata(mfd);
 	fbi = mfd->fbi;
 	mdp5_data = mfd_to_mdp5_data(mfd);
 
@@ -3346,6 +3347,8 @@ static int mdss_mdp_overlay_on(struct msm_fb_data_type *mfd)
 		if (IS_ERR_OR_NULL(ctl))
 			return PTR_ERR(ctl);
 		mdp5_data->ctl = ctl;
+	} else {
+		ctl = mdp5_data->ctl;
 	}
 
 	if (!mfd->panel_info->cont_splash_enabled &&
