@@ -1022,6 +1022,8 @@ int ipa_get_ep_mapping(enum ipa_client_type client);
 
 bool ipa_is_ready(void);
 
+void ipa_q6_init_done(void);
+
 #else /* CONFIG_IPA */
 
 /*
@@ -1525,6 +1527,10 @@ static inline int ipa_get_ep_mapping(enum ipa_client_type client)
 static inline bool ipa_is_ready(void)
 {
 	return false;
+}
+
+static inline void ipa_q6_init_done(void)
+{
 }
 #endif /* CONFIG_IPA*/
 
