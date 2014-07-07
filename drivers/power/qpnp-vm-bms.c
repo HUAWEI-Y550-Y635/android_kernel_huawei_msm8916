@@ -213,6 +213,7 @@ struct bms_dt_cfg {
 	int				cfg_resume_soc;
 #endif
 	int				cfg_battery_aging_comp;
+	bool				cfg_use_reported_soc;
 };
 
 struct qpnp_bms_chip {
@@ -317,15 +318,22 @@ struct qpnp_bms_chip {
 	struct power_supply		bms_psy;
 	struct power_supply		*batt_psy;
 	struct power_supply		*usb_psy;
+	bool				reported_soc_in_use;
+	bool				charger_removed_since_full;
+	bool				charger_reinserted;
+	bool				reported_soc_high_current;
+	int				reported_soc;
+	int				reported_soc_change_sec;
+	int				reported_soc_delta;
 #ifdef CONFIG_HUAWEI_KERNEL
-       bool               ui_soc_high_current;
-       bool 				ui_soc_tag;
-	bool 				charger_removed_since_full;
-	bool 				charger_reinserted;
+        bool               		ui_soc_high_current;
+        bool 				ui_soc_tag;
+	//bool 				charger_removed_since_full;
+	//bool 				charger_reinserted;
 	int 				ui_soc;
 	int 				ui_soc_change_sec;
 	int 				ui_soc_delta;
-    bool                use_ext_charger;
+        bool                		use_ext_charger;
 #endif
 };
 
@@ -1734,6 +1742,14 @@ static void check_eoc_condition(struct qpnp_bms_chip *chip)
 					chip->ocv_at_100 = -EINVAL;
 				}
 			}
+			if (chip->dt.cfg_use_reported_soc) {
+				/* begin reported_soc process */
+				chip->reported_soc_in_use = true;
+				chip->charger_removed_since_full = false;
+				chip->charger_reinserted = false;
+				chip->reported_soc = 100;
+				pr_debug("Begin reported_soc process\n");
+			}
 #ifdef CONFIG_HUAWEI_KERNEL
 			/* begin ui_soc process */
            if(is_charger_present(chip))
@@ -1758,10 +1774,15 @@ static void check_eoc_condition(struct qpnp_bms_chip *chip)
 			 * This gets called once when the SOC falls
 			 * below 100.
 			 */
-			ret.intval = POWER_SUPPLY_STATUS_DISCHARGING;
-			chip->batt_psy->set_property(chip->batt_psy,
-						POWER_SUPPLY_PROP_STATUS, &ret);
-
+			if (chip->reported_soc_in_use
+					&& chip->reported_soc == 100) {
+				pr_debug("reported_soc=100, last_soc=%d, do not send DISCHARING status\n",
+						chip->last_soc);
+			} else {
+				ret.intval = POWER_SUPPLY_STATUS_DISCHARGING;
+				chip->batt_psy->set_property(chip->batt_psy,
+					POWER_SUPPLY_PROP_STATUS, &ret);
+			}
 			pr_debug("SOC dropped (%d) discarding ocv_at_100\n",
 							chip->last_soc);
 			chip->ocv_at_100 = -EINVAL;
@@ -1913,6 +1934,39 @@ static int report_voltage_based_soc(struct qpnp_bms_chip *chip)
 	pr_debug("Reported voltage based soc = %d\n",
 			chip->prev_voltage_based_soc);
 	return chip->prev_voltage_based_soc;
+}
+
+static int prepare_reported_soc(struct qpnp_bms_chip *chip)
+{
+	if (chip->charger_removed_since_full == false) {
+		/*
+		 * charger is not removed since full,
+		 * keep reported_soc as 100 and calculate the delta soc
+		 * between reported_soc and last_soc
+		 */
+		chip->reported_soc = 100;
+		chip->reported_soc_delta = 100 - chip->last_soc;
+		pr_debug("Keep at reported_soc 100, reported_soc_delta=%d, last_soc=%d\n",
+						chip->reported_soc_delta,
+						chip->last_soc);
+	} else {
+		/* charger is removed since full */
+		if (chip->charger_reinserted) {
+			/*
+			 * charger reinserted, keep the reported_soc
+			 * until it equals to last_soc.
+			 */
+			if (chip->reported_soc == chip->last_soc) {
+				chip->reported_soc_in_use = false;
+				chip->reported_soc_high_current = false;
+				pr_debug("reported_soc equals to last_soc, stop reported_soc process\n");
+			}
+			chip->reported_soc_change_sec = 0;
+		}
+	}
+	pr_debug("Reporting reported_soc=%d, last_soc=%d\n",
+					chip->reported_soc, chip->last_soc);
+	return chip->reported_soc;
 }
 
 #define SOC_CATCHUP_SEC_MAX		600
@@ -2083,6 +2137,9 @@ static int report_vm_bms_soc(struct qpnp_bms_chip *chip)
     else
 	{
 	   backup_ocv_soc(chip, chip->last_ocv_uv, chip->last_soc);
+
+	if (chip->reported_soc_in_use)
+		return prepare_reported_soc(chip);
 	}
     #else
     backup_ocv_soc(chip, chip->last_ocv_uv, chip->last_soc);
@@ -2670,7 +2727,7 @@ static int calculate_soc_from_voltage(struct qpnp_bms_chip *chip)
 	return 0;
 }
 #ifdef CONFIG_HUAWEI_KERNEL
-#define UI_SOC_CATCHUP_TIME	(120)
+//#define UI_SOC_CATCHUP_TIME	(120)
 #define UI_SOC_HIGH_CURRENT_CATCHUP_TIME	(60)
 #endif
 
@@ -2729,6 +2786,45 @@ static void monitor_normal_soc_jump(struct qpnp_bms_chip *chip, const int new_so
 }
 #endif
 
+static void calculate_reported_soc(struct qpnp_bms_chip *chip)
+{
+	union power_supply_propval ret = {0,};
+
+	if (chip->reported_soc > chip->last_soc) {
+		/*send DISCHARGING status if the reported_soc drops from 100 */
+		if (chip->reported_soc == 100) {
+			ret.intval = POWER_SUPPLY_STATUS_DISCHARGING;
+			chip->batt_psy->set_property(chip->batt_psy,
+				POWER_SUPPLY_PROP_STATUS, &ret);
+			pr_debug("Report discharging status, reported_soc=%d, last_soc=%d\n",
+					chip->reported_soc, chip->last_soc);
+		}
+		/*
+		* reported_soc_delta is used to prevent
+		* the big change in last_soc,
+		* this is not used in high current mode
+		*/
+		if (chip->reported_soc_delta > 0)
+			chip->reported_soc_delta--;
+
+		if (chip->reported_soc_high_current)
+			chip->reported_soc--;
+		else
+			chip->reported_soc = chip->last_soc
+					+ chip->reported_soc_delta;
+
+		pr_debug("New reported_soc=%d, last_soc is=%d\n",
+					chip->reported_soc, chip->last_soc);
+	} else {
+		chip->reported_soc_in_use = false;
+		chip->reported_soc_high_current = false;
+		pr_debug("reported_soc equals last_soc,stop reported_soc process\n");
+	}
+	pr_debug("bms power_supply_changed\n");
+	power_supply_changed(&chip->bms_psy);
+}
+
+#define UI_SOC_CATCHUP_TIME	(60)
 static void monitor_soc_work(struct work_struct *work)
 {
 	struct qpnp_bms_chip *chip = container_of(work,
@@ -2901,6 +2997,21 @@ static void monitor_soc_work(struct work_struct *work)
         }
     }
 #endif
+
+	if (chip->reported_soc_in_use && chip->charger_removed_since_full
+				&& !chip->charger_reinserted) {
+		/* record the elapsed time after last reported_soc change */
+		chip->reported_soc_change_sec += chip->delta_time_s;
+		pr_debug("reported_soc_change_sec=%d\n",
+					chip->reported_soc_change_sec);
+
+		/* above the catch up time, calculate new reported_soc */
+		if (chip->reported_soc_change_sec > UI_SOC_CATCHUP_TIME) {
+			calculate_reported_soc(chip);
+			chip->reported_soc_change_sec = 0;
+		}
+	}
+
 	mutex_unlock(&chip->last_soc_mutex);
 
 	bms_relax(&chip->vbms_soc_wake_source);
@@ -3191,6 +3302,42 @@ static void battery_status_check(struct qpnp_bms_chip *chip)
 	}
 }
 
+#define HIGH_CURRENT_TH 2
+static void reported_soc_check_status(struct qpnp_bms_chip *chip)
+{
+	u8 present;
+
+	present = is_charger_present(chip);
+	pr_debug("usb_present=%d\n", present);
+
+	if (!present && !chip->charger_removed_since_full) {
+		chip->charger_removed_since_full = true;
+		pr_debug("reported_soc: charger removed since full\n");
+		return;
+	}
+	if (chip->reported_soc_high_current) {
+		pr_debug("reported_soc in high current mode, return\n");
+		return;
+	}
+	if ((chip->reported_soc - chip->last_soc) >
+			(100 - chip->dt.cfg_soc_resume_limit
+						+ HIGH_CURRENT_TH)) {
+		chip->reported_soc_high_current = true;
+		chip->charger_removed_since_full = true;
+		chip->charger_reinserted = false;
+		pr_debug("reported_soc enters high current mode\n");
+		return;
+	}
+	if (present && chip->charger_removed_since_full) {
+		chip->charger_reinserted = true;
+		pr_debug("reported_soc: charger reinserted\n");
+	}
+	if (!present && chip->charger_removed_since_full) {
+		chip->charger_reinserted = false;
+		pr_debug("reported_soc: charger removed again\n");
+	}
+}
+
 static void qpnp_vm_bms_ext_power_changed(struct power_supply *psy)
 {
 	struct qpnp_bms_chip *chip = container_of(psy, struct qpnp_bms_chip,
@@ -3208,9 +3355,13 @@ static void qpnp_vm_bms_ext_power_changed(struct power_supply *psy)
 	else
 	{
 		battery_insertion_check(chip);
+
+	if (chip->reported_soc_in_use)
+		reported_soc_check_status(chip);
 	}
 #else
 	battery_insertion_check(chip);
+
 	/* Re-schedule monitor_soc_work */
 	cancel_delayed_work_sync(&chip->monitor_soc_work);
 	schedule_delayed_work(&chip->monitor_soc_work, 0);
@@ -4080,6 +4231,7 @@ static int show_bms_config(struct seq_file *m, void *data)
 			"force_s3_on_suspend\t=\t%d\n"
 			"report_charger_eoc\t=\t%d\n"
 			"aging_compensation\t=\t%d\n"
+			"use_reported_soc\t=\t%d\n"
 			"s1_sample_interval_ms\t=\t%d\n"
 			"s2_sample_interval_ms\t=\t%d\n"
 			"s1_sample_count\t=\t%d\n"
@@ -4101,6 +4253,7 @@ static int show_bms_config(struct seq_file *m, void *data)
 			chip->dt.cfg_force_s3_on_suspend,
 			chip->dt.cfg_report_charger_eoc,
 			chip->dt.cfg_battery_aging_comp,
+			chip->dt.cfg_use_reported_soc,
 			s1_sample_interval,
 			s2_sample_interval,
 			s1_sample_count,
@@ -4489,6 +4642,8 @@ static int parse_bms_dt_properties(struct qpnp_bms_chip *chip)
 			"qcom,force-bms-active-on-charger");
 	chip->dt.cfg_battery_aging_comp = of_property_read_bool(
 			chip->spmi->dev.of_node, "qcom,batt-aging-comp");
+	chip->dt.cfg_use_reported_soc = of_property_read_bool(
+			chip->spmi->dev.of_node, "qcom,use-reported-soc");
 	pr_debug("v_cutoff_uv=%d, max_v=%d\n", chip->dt.cfg_v_cutoff_uv,
 					chip->dt.cfg_max_voltage_uv);
 	pr_debug("r_conn=%d shutdown_soc_valid_limit=%d\n",
@@ -4504,6 +4659,8 @@ static int parse_bms_dt_properties(struct qpnp_bms_chip *chip)
 			chip->dt.cfg_disable_bms,
 			chip->dt.cfg_force_bms_active_on_charger,
 			chip->dt.cfg_battery_aging_comp);
+	pr_debug("use-reported-soc is %d\n",
+			chip->dt.cfg_use_reported_soc);
 
 	return 0;
 }
