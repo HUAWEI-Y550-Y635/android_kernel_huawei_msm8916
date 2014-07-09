@@ -849,7 +849,8 @@ static int ipa_setup_exception_path(void)
 				IPA_RESOURCE_NAME_MAX);
 		/* set template for the A5_MUX hdr in header addition block */
 		hdr_entry->hdr_len = IPA_A5_MUX_HEADER_LENGTH;
-	} else if (ipa_ctx->ipa_hw_type == IPA_HW_v2_0) {
+	} else if (ipa_ctx->ipa_hw_type == IPA_HW_v2_0 ||
+			ipa_ctx->ipa_hw_type == IPA_HW_v2_5) {
 		strlcpy(hdr_entry->name, IPA_LAN_RX_HDR_NAME,
 				IPA_RESOURCE_NAME_MAX);
 		hdr_entry->hdr_len = IPA_LAN_RX_HEADER_LENGTH;
@@ -1315,9 +1316,16 @@ static int ipa_init_sram(void)
 	struct ipa_mem_buffer mem;
 	int rc = 0;
 
-	phys_addr = ipa_ctx->ipa_wrapper_base + IPA_REG_BASE_OFST +
-		IPA_SRAM_DIRECT_ACCESS_N_OFST_v2_0(
-				ipa_ctx->smem_restricted_bytes / 4);
+	if (ipa_ctx->ipa_hw_type == IPA_HW_v2_5) {
+		phys_addr = ipa_ctx->ipa_wrapper_base +
+			ipa_ctx->ctrl->ipa_reg_base_ofst +
+			IPA_SRAM_SW_FIRST_v2_5;
+	} else {
+		phys_addr = ipa_ctx->ipa_wrapper_base +
+			ipa_ctx->ctrl->ipa_reg_base_ofst +
+			IPA_SRAM_DIRECT_ACCESS_N_OFST_v2_0(
+					ipa_ctx->smem_restricted_bytes / 4);
+	}
 	ipa_sram_mmio = ioremap(phys_addr,
 			ipa_ctx->smem_sz - ipa_ctx->smem_restricted_bytes);
 	if (!ipa_sram_mmio) {
@@ -1618,7 +1626,8 @@ static int ipa_setup_apps_pipes(void)
 	}
 	IPADBG("Apps to IPA cmd pipe is connected\n");
 
-	if (ipa_ctx->ipa_hw_type == IPA_HW_v2_0) {
+	if (ipa_ctx->ipa_hw_type == IPA_HW_v2_0 ||
+		ipa_ctx->ipa_hw_type == IPA_HW_v2_5) {
 		ipa_init_sram();
 		ipa_init_hdr();
 		ipa_init_rt4();
@@ -1648,7 +1657,8 @@ static int ipa_setup_apps_pipes(void)
 	if (ipa_ctx->ipa_hw_type == IPA_HW_v1_1) {
 		sys_in.ipa_ep_cfg.hdr.hdr_a5_mux = 1;
 		sys_in.ipa_ep_cfg.hdr.hdr_len = IPA_A5_MUX_HEADER_LENGTH;
-	} else if (ipa_ctx->ipa_hw_type == IPA_HW_v2_0) {
+	} else if (ipa_ctx->ipa_hw_type == IPA_HW_v2_0 ||
+			ipa_ctx->ipa_hw_type == IPA_HW_v2_5) {
 		sys_in.notify = ipa_lan_rx_cb;
 		sys_in.priv = NULL;
 		sys_in.ipa_ep_cfg.hdr.hdr_len = IPA_LAN_RX_HEADER_LENGTH;
@@ -1847,7 +1857,8 @@ static int ipa_get_clks(struct device *dev)
 		return -ENODEV;
 	}
 
-	if (ipa_ctx->ipa_hw_type != IPA_HW_v2_0) {
+	if (ipa_ctx->ipa_hw_type != IPA_HW_v2_0 &&
+		ipa_ctx->ipa_hw_type != IPA_HW_v2_5) {
 		ipa_cnoc_clk = clk_get(dev, "iface_clk");
 		if (IS_ERR(ipa_cnoc_clk)) {
 			ipa_cnoc_clk = NULL;
@@ -2006,7 +2017,7 @@ void ipa_disable_clks(void)
 	IPADBG("disabling IPA clocks and bus voting\n");
 
 	if (ipa_ctx->ipa_hw_mode != IPA_HW_MODE_NORMAL)
-			return;
+		return;
 
 	ipa_ctx->ctrl->ipa_disable_clks();
 
@@ -2136,6 +2147,7 @@ static int ipa_setup_bam_cfg(const struct ipa_plat_drv_res *res)
 		reg_val = IPA_BAM_CNFG_BITS_VALv1_1;
 		break;
 	case IPA_HW_v2_0:
+	case IPA_HW_v2_5:
 		reg_val = IPA_BAM_CNFG_BITS_VALv2_0;
 		break;
 	default:
@@ -2442,7 +2454,8 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	ipa_enable_clks();
 
 	/* setup IPA register access */
-	ipa_ctx->mmio = ioremap(resource_p->ipa_mem_base + IPA_REG_BASE_OFST,
+	ipa_ctx->mmio = ioremap(resource_p->ipa_mem_base +
+			ipa_ctx->ctrl->ipa_reg_base_ofst,
 			resource_p->ipa_mem_size);
 	if (!ipa_ctx->mmio) {
 		IPAERR(":ipa-base ioremap err.\n");
