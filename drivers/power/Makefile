@@ -69,6 +69,7 @@ obj-$(CONFIG_QPNP_SMBCHARGER)	+= qpnp-smbcharger.o
 obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
 obj-$(CONFIG_CHARGER_TPS65090)	+= tps65090-charger.o
 obj-$(CONFIG_BATTERY_BCL)	+= battery_current_limit.o
+obj-$(CONFIG_MSM_BCL_CTL)	+= msm_bcl.o
 obj-$(CONFIG_POWER_RESET)	+= reset/
 obj-$(CONFIG_CHARGER_BQ24152)	+= bq24152_charger.o
 obj-$(CONFIG_BATTERY_BQ27510)	+= bq27510_bms.o
