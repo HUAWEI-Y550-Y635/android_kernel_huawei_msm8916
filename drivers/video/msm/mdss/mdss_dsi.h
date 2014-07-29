@@ -317,6 +317,7 @@ struct mdss_dsi_ctrl_pdata {
 	int new_fps;
 	int pwm_enabled;
 	bool panel_bias_vreg;
+	bool dsi_irq_line;
 	struct mdss_rect roi;
 	struct pwm_device *pwm_bl;
 	struct dsi_drv_cm_data shared_pdata;
