@@ -1005,26 +1005,34 @@ int teth_bridge_disconnect(enum ipa_client_type client);
 int teth_bridge_connect(struct teth_bridge_connect_params *connect_params);
 
 /*
- * Misc.
+ * mux id
  */
-void ipa_bam_reg_dump(void);
-bool ipa_emb_ul_pipes_empty(void);
-
-/* mux id*/
 int ipa_write_qmap_id(struct ipa_ioc_write_qmapid *param_in);
 
-/*interrupts*/
+/*
+ * interrupts
+ */
 int ipa_add_interrupt_handler(enum ipa_irq_type interrupt,
 		ipa_irq_handler_t handler,
 		bool deferred_flag,
 		void *private_data);
+
 int ipa_remove_interrupt_handler(enum ipa_irq_type interrupt);
+
+/*
+ * Miscellaneous
+ */
+void ipa_bam_reg_dump(void);
+
+bool ipa_emb_ul_pipes_empty(void);
 
 int ipa_get_ep_mapping(enum ipa_client_type client);
 
 bool ipa_is_ready(void);
 
 void ipa_q6_init_done(void);
+
+enum ipa_hw_type ipa_get_hw_type(void);
 
 #else /* CONFIG_IPA */
 
@@ -1322,7 +1330,7 @@ static inline int ipa_tx_dp(enum ipa_client_type dst, struct sk_buff *skb,
 
 /*
  * To transfer multiple data packets
-*/
+ */
 static inline int ipa_tx_dp_mul(
 	enum ipa_client_type dst,
 	struct ipa_tx_data_desc *data_desc)
@@ -1335,7 +1343,6 @@ static inline void ipa_free_skb(struct ipa_rx_data *rx_in)
 	return;
 }
 
-
 /*
  * System pipes
  */
@@ -1346,6 +1353,37 @@ static inline int ipa_setup_sys_pipe(struct ipa_sys_connect_params *sys_in,
 }
 
 static inline int ipa_teardown_sys_pipe(u32 clnt_hdl)
+{
+	return -EPERM;
+}
+
+static inline int ipa_connect_wdi_pipe(struct ipa_wdi_in_params *in,
+		struct ipa_wdi_out_params *out)
+{
+	return -EPERM;
+}
+
+static inline int ipa_disconnect_wdi_pipe(u32 clnt_hdl)
+{
+	return -EPERM;
+}
+
+static inline int ipa_enable_wdi_pipe(u32 clnt_hdl)
+{
+	return -EPERM;
+}
+
+static inline int ipa_disable_wdi_pipe(u32 clnt_hdl)
+{
+	return -EPERM;
+}
+
+static inline int ipa_resume_wdi_pipe(u32 clnt_hdl)
+{
+	return -EPERM;
+}
+
+static inline int ipa_suspend_wdi_pipe(u32 clnt_hdl)
 {
 	return -EPERM;
 }
@@ -1442,7 +1480,7 @@ static inline int ipa_rm_inactivity_timer_release_resource(
 }
 
 /*
- * Tethering bridge (Rmnetm / MBIM)
+ * Tethering bridge (Rmnet / MBIM)
  */
 static inline int teth_bridge_init(struct teth_bridge_init_params *params)
 {
@@ -1460,23 +1498,17 @@ static inline int teth_bridge_connect(struct teth_bridge_connect_params
 	return -EPERM;
 }
 
-static inline void ipa_bam_reg_dump(void)
-{
-	return;
-}
-
-static inline bool ipa_emb_ul_pipes_empty(void)
-{
-	return false;
-}
-
-/* mux id */
+/*
+ * mux id
+ */
 static inline int ipa_write_qmap_id(struct ipa_ioc_write_qmapid *param_in)
 {
 	return -EPERM;
 }
 
-/* interrupts */
+/*
+ * interrupts
+ */
 static inline int ipa_add_interrupt_handler(enum ipa_irq_type interrupt,
 		ipa_irq_handler_t handler,
 		bool deferred_flag,
@@ -1490,35 +1522,17 @@ static inline int ipa_remove_interrupt_handler(enum ipa_irq_type interrupt)
 	return -EPERM;
 }
 
-static inline int ipa_connect_wdi_pipe(struct ipa_wdi_in_params *in,
-		struct ipa_wdi_out_params *out)
+/*
+ * Miscellaneous
+ */
+static inline void ipa_bam_reg_dump(void)
 {
-	return -EPERM;
+	return;
 }
 
-static inline int ipa_disconnect_wdi_pipe(u32 clnt_hdl)
+static inline bool ipa_emb_ul_pipes_empty(void)
 {
-	return -EPERM;
-}
-
-static inline int ipa_enable_wdi_pipe(u32 clnt_hdl)
-{
-	return -EPERM;
-}
-
-static inline int ipa_disable_wdi_pipe(u32 clnt_hdl)
-{
-	return -EPERM;
-}
-
-static inline int ipa_resume_wdi_pipe(u32 clnt_hdl)
-{
-	return -EPERM;
-}
-
-static inline int ipa_suspend_wdi_pipe(u32 clnt_hdl)
-{
-	return -EPERM;
+	return false;
 }
 
 static inline int ipa_get_ep_mapping(enum ipa_client_type client)
@@ -1534,6 +1548,12 @@ static inline bool ipa_is_ready(void)
 static inline void ipa_q6_init_done(void)
 {
 }
+
+static inline enum ipa_hw_type ipa_get_hw_type(void)
+{
+	return IPA_HW_None;
+}
+
 #endif /* CONFIG_IPA*/
 
 #endif /* _IPA_H_ */
