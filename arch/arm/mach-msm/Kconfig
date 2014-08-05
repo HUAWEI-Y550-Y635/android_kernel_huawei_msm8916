@@ -195,6 +195,7 @@ config ARCH_MSMZIRC
 	select ARM_GIC
 	select CPU_V7
 	select REGULATOR
+	select REGULATOR_RPM_SMD
 	select HAVE_ARM_ARCH_TIMER
 	select MSM_SPM
 	select MSM_NOPM
