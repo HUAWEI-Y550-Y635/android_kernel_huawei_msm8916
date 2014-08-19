@@ -99,6 +99,7 @@ void mdss_dsi_ctrl_init(struct device *ctrl_dev,
 	init_completion(&ctrl->dma_comp);
 	init_completion(&ctrl->mdp_comp);
 	init_completion(&ctrl->video_comp);
+	init_completion(&ctrl->dynamic_comp);
 	init_completion(&ctrl->bta_comp);
 	spin_lock_init(&ctrl->irq_lock);
 	spin_lock_init(&ctrl->mdp_lock);
@@ -1471,6 +1472,31 @@ static int mdss_dsi_cmd_dma_rx(struct mdss_dsi_ctrl_pdata *ctrl,
 	return rx_byte;
 }
 
+void mdss_dsi_en_wait4dynamic_done(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	unsigned long flag;
+	u32 data;
+	/* DSI_INTL_CTRL */
+	data = MIPI_INP((ctrl->ctrl_base) + 0x0110);
+	data |= DSI_INTR_DYNAMIC_REFRESH_MASK;
+	MIPI_OUTP((ctrl->ctrl_base) + 0x0110, data);
+
+	spin_lock_irqsave(&ctrl->mdp_lock, flag);
+	INIT_COMPLETION(ctrl->dynamic_comp);
+	mdss_dsi_enable_irq(ctrl, DSI_DYNAMIC_TERM);
+	spin_unlock_irqrestore(&ctrl->mdp_lock, flag);
+	MIPI_OUTP((ctrl->ctrl_base) + DSI_DYNAMIC_REFRESH_CTRL,
+			(BIT(8) | BIT(0)));
+
+	if (!wait_for_completion_timeout(&ctrl->dynamic_comp,
+				msecs_to_jiffies(VSYNC_PERIOD * 4)))
+		pr_err("Dynamic interrupt timedout\n");
+
+	data = MIPI_INP((ctrl->ctrl_base) + 0x0110);
+	data &= ~DSI_INTR_DYNAMIC_REFRESH_MASK;
+	MIPI_OUTP((ctrl->ctrl_base) + 0x0110, data);
+}
+
 void mdss_dsi_wait4video_done(struct mdss_dsi_ctrl_pdata *ctrl)
 {
 	unsigned long flag;
@@ -1984,5 +2010,11 @@ irqreturn_t mdss_dsi_isr(int irq, void *ptr)
 		spin_unlock(&ctrl->mdp_lock);
 	}
 
+	if (isr & DSI_INTR_DYNAMIC_REFRESH_DONE) {
+		spin_lock(&ctrl->mdp_lock);
+		mdss_dsi_disable_irq_nosync(ctrl, DSI_DYNAMIC_TERM);
+		complete(&ctrl->dynamic_comp);
+		spin_unlock(&ctrl->mdp_lock);
+	}
 	return IRQ_HANDLED;
 }
