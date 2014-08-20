@@ -112,6 +112,11 @@
 #include "msm8916-iommu-domains.dtsi"
 #include "msm8916-bus.dtsi"
 #include "msm8916-camera.dtsi"
+<<<<<<< HEAD
+=======
+#include "msm8916-drm.dtsi"
+
+>>>>>>> f0e13c5... kgsl/drm/dts: Add drm dts file for kgsl-drm.
 &soc {
 	#address-cells = <1>;
 	#size-cells = <1>;
