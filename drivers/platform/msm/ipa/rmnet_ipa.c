@@ -1900,6 +1900,9 @@ static void __exit ipa_wwan_cleanup(void)
 
 static void ssr_ipa_wwan_remove(struct work_struct *work)
 {
+	if (!atomic_read(&is_initialized))
+		return;
+
 	platform_driver_unregister(&rmnet_ipa_driver);
 }
 
