@@ -1871,9 +1871,6 @@ static const struct file_operations ipa_drv_fops = {
 
 static int ipa_get_clks(struct device *dev)
 {
-	if (ipa_ctx->ipa_hw_mode != IPA_HW_MODE_NORMAL)
-		return 0;
-
 	ipa_clk = clk_get(dev, "core_clk");
 	if (IS_ERR(ipa_clk)) {
 		ipa_clk = NULL;
@@ -1987,9 +1984,6 @@ void ipa_enable_clks(void)
 {
 	IPADBG("enabling IPA clocks and bus voting\n");
 
-	if (ipa_ctx->ipa_hw_mode != IPA_HW_MODE_NORMAL)
-		return;
-
 	ipa_ctx->ctrl->ipa_enable_clks();
 
 	if (msm_bus_scale_client_update_request(ipa_ctx->ipa_bus_hdl, 1))
@@ -2039,9 +2033,6 @@ void _ipa_disable_clks_v2_0(void)
 void ipa_disable_clks(void)
 {
 	IPADBG("disabling IPA clocks and bus voting\n");
-
-	if (ipa_ctx->ipa_hw_mode != IPA_HW_MODE_NORMAL)
-		return;
 
 	ipa_ctx->ctrl->ipa_disable_clks();
 
@@ -2643,8 +2634,9 @@ static int ipa_init(const struct ipa_plat_drv_res *resource_p,
 	bam_props.num_pipes = IPA_NUM_PIPES;
 	bam_props.summing_threshold = IPA_SUMMING_THRESHOLD;
 	bam_props.event_threshold = IPA_EVENT_THRESHOLD;
-	bam_props.options |= (SPS_BAM_NO_LOCAL_CLK_GATING |
-		SPS_BAM_OPT_IRQ_WAKEUP);
+	bam_props.options |= SPS_BAM_NO_LOCAL_CLK_GATING;
+	if (ipa_ctx->ipa_hw_mode != IPA_HW_MODE_VIRTUAL)
+		bam_props.options |= SPS_BAM_OPT_IRQ_WAKEUP;
 	bam_props.options |= SPS_BAM_RES_CONFIRM;
 	bam_props.ee = resource_p->ee;
 	bam_props.callback = sps_event_cb;
