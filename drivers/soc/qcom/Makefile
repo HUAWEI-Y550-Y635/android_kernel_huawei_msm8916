@@ -56,9 +56,15 @@ ifdef CONFIG_MSM_SUBSYSTEM_RESTART
        obj-y += subsystem_restart.o
        obj-y += ramdump.o
 endif
+
+ifdef CONFIG_MSM_RTB
+	obj-y += msm_rtb-hotplug.o
+endif
+
 obj-$(CONFIG_MSM_SYSMON_COMM) += sysmon.o
 obj-$(CONFIG_MSM_CPU_PWR_CTL) += cpu_pwr_ctl.o
 obj-$(CONFIG_STATE_NOTIFIER) += state_notifier.o
 obj-$(CONFIG_MSM_LIMITER) += msm_limiter.o
 obj-$(CONFIG_MSM_HOTPLUG) += msm_hotplug.o
 obj-$(CONFIG_QCOM_EARLY_RANDOM)	+= early_random.o
+obj-$(CONFIG_MSM_RTB) += msm_rtb-hotplug.o
