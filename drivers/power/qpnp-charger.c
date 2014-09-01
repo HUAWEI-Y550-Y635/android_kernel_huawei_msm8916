@@ -3620,12 +3620,14 @@ qpnp_chg_btc_hot_irq_debounce_work(struct work_struct *work)
 	int rc, bat_therm_volt;
 	u8 reg;
 
+	pm_stay_awake(chip->dev);
+
 	/* Get current BTC HOT_THD settings */
 	rc = qpnp_chg_read(chip, &reg,
 			chip->bat_if_base + BAT_IF_BTC_CTRL, 1);
 	if (rc) {
 		pr_err("failed to read BTC_CTRL rc=%d\n", rc);
-		return;
+		goto relax;
 	}
 
 	hot_thd_35_pct = (reg & BTC_HOT) ? true : false;
@@ -3636,7 +3638,7 @@ qpnp_chg_btc_hot_irq_debounce_work(struct work_struct *work)
 	if (rc) {
 		pr_err("Unable to read batt temperature rc=%d\n",
 				rc);
-		return;
+		goto relax;
 	}
 
 	bat_therm_volt = results.measurement;
@@ -3651,7 +3653,7 @@ qpnp_chg_btc_hot_irq_debounce_work(struct work_struct *work)
 		if (rc) {
 			pr_err("failed to change HOT_THD to 25%% rc=%d\n",
 					rc);
-			return;
+			goto relax;
 		}
 		bypass_btc_hot_comparator(chip, 1);
 
@@ -3668,9 +3670,16 @@ qpnp_chg_btc_hot_irq_debounce_work(struct work_struct *work)
 		if (rc) {
 			pr_err("failed to change HOT_THD to 35%% rc=%d\n",
 					rc);
-			return;
+			goto relax;
 		}
+	} else {
+		pr_debug("BAT temp status is not HOT\n");
+		goto relax;
 	}
+
+relax:
+	pm_relax(chip->dev);
+	return;
 }
 
 static void
