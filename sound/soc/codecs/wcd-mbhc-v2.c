@@ -244,8 +244,7 @@ static int wcd_event_notify(struct notifier_block *self, unsigned long val,
 		snd_soc_update_bits(codec,
 				MSM8X16_WCD_A_ANALOG_MICB_2_EN,
 				0x18, 0x00);
-		snd_soc_write(codec, MSM8X16_WCD_A_ANALOG_MICB_1_VAL,
-				0x20);
+		mbhc->mbhc_cb->set_micbias_value(codec);
 		/* Enable current source again for polling */
 		if (mbhc->is_hs_inserted)
 			snd_soc_update_bits(codec,
@@ -888,7 +887,7 @@ static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 	snd_soc_update_bits(codec, MSM8X16_WCD_A_ANALOG_MICB_1_CTL, 0x60, 0x00);
 	snd_soc_update_bits(codec, MSM8X16_WCD_A_ANALOG_MICB_2_EN, 0x80, 0x00);
 	snd_soc_write(codec, MSM8X16_WCD_A_ANALOG_MBHC_FSM_CTL, reg);
-	snd_soc_write(codec, MSM8X16_WCD_A_ANALOG_MICB_1_VAL, 0x20);
+	mbhc->mbhc_cb->set_micbias_value(codec);
 	snd_soc_update_bits(codec, MSM8X16_WCD_A_ANALOG_MICB_2_EN, 0x18, 0x00);
 
 	pr_debug("%s: leave\n", __func__);
