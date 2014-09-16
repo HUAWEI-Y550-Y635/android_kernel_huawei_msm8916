@@ -319,7 +319,6 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 	int	i, j;
 	int	nlines;
 	u32	*p;
-	bool	is_cma = 0;
 
 	/*
 	 * don't attempt to dump non-kernel addresses or
@@ -349,34 +348,22 @@ static void show_data(unsigned long addr, int nbytes, const char *name)
 			u32	data;
 			/*
 			 * vmalloc addresses may point to
-			 * memory-mapped peripherals. CMA
-			 * addresses may be locked down.
+			 * memory-mapped peripherals
 			 */
-			if (virt_addr_valid(p) &&
-				pfn_valid(__pa(p) >> PAGE_SHIFT)) {
-
-				is_cma = is_cma_pageblock(virt_to_page(p));
-				if (is_cma || probe_kernel_address(p, data)) {
-					printk(" ********");
-				} else {
-					printk(" %08x", data);
-				}
-				++p;
-			}
-			else {
+			if (!virt_addr_valid(p) ||
+			    probe_kernel_address(p, data)) {
 				printk(" ********");
+			} else {
+				printk(KERN_CONT " %08x", data);
 			}
+			++p;
 		}
-		printk("\n");
+		printk(KERN_CONT "\n");
 	}
 }
 
 static void show_extra_register_data(struct pt_regs *regs, int nbytes)
 {
-	mm_segment_t fs;
-
-	fs = get_fs();
-	set_fs(KERNEL_DS);
 	show_data(regs->ARM_pc - nbytes, nbytes * 2, "PC");
 	show_data(regs->ARM_lr - nbytes, nbytes * 2, "LR");
 	show_data(regs->ARM_sp - nbytes, nbytes * 2, "SP");
@@ -393,7 +380,6 @@ static void show_extra_register_data(struct pt_regs *regs, int nbytes)
 	show_data(regs->ARM_r8 - nbytes, nbytes * 2, "R8");
 	show_data(regs->ARM_r9 - nbytes, nbytes * 2, "R9");
 	show_data(regs->ARM_r10 - nbytes, nbytes * 2, "R10");
-	set_fs(fs);
 }
 
 void __show_regs(struct pt_regs *regs)
@@ -452,15 +438,8 @@ void __show_regs(struct pt_regs *regs)
 		printk("Control: %08x%s\n", ctrl, buf);
 	}
 #endif
-
-#ifdef CONFIG_HUAWEI_KERNEL
-	if(!user_mode(regs))
-	{
+	if (get_fs() == get_ds())
 		show_extra_register_data(regs, 128);
-	}
-#else
-	show_extra_register_data(regs, 128);
-#endif
 }
 
 void show_regs(struct pt_regs * regs)
