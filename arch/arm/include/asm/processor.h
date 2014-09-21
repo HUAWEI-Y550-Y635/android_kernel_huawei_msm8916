@@ -95,29 +95,6 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)	task_pt_regs(tsk)->ARM_pc
 #define KSTK_ESP(tsk)	task_pt_regs(tsk)->ARM_sp
 
-/*
- * Prefetching support - only ARMv5.
- */
-#if __LINUX_ARM_ARCH__ >= 5
-
-#define ARCH_HAS_PREFETCH
-static inline void prefetch(const void *ptr)
-{
-	__asm__ __volatile__(
-		"pld\t%a0"
-		:
-		: "p" (ptr)
-		: "cc");
-}
-
-#define ARCH_HAS_PREFETCHW
-#define prefetchw(ptr)	prefetch(ptr)
-
-#define ARCH_HAS_SPINLOCK_PREFETCH
-#define spin_lock_prefetch(x) do { } while (0)
-
-#endif
-
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
 #endif
