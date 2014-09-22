@@ -797,6 +797,7 @@
 			qcom,channel-id = <0>;
 			qcom,supported-sizes = <6>, <7>, <9>;
 			qcom,ramp-index = <0>;
+			#pwm-cells = <2>;
 		};
 
 		pwm@b200 {
@@ -807,6 +808,7 @@
 			qcom,channel-id = <1>;
 			qcom,supported-sizes = <6>, <7>, <9>;
 			qcom,ramp-index = <1>;
+			#pwm-cells = <2>;
 		};
 
 		pwm@b300 {
@@ -817,6 +819,7 @@
 			qcom,channel-id = <2>;
 			qcom,supported-sizes = <6>, <7>, <9>;
 			qcom,ramp-index = <2>;
+			#pwm-cells = <2>;
 		};
 
 		pwm@b400 {
@@ -827,6 +830,7 @@
 			qcom,channel-id = <3>;
 			qcom,supported-sizes = <6>, <7>, <9>;
 			qcom,ramp-index = <3>;
+			#pwm-cells = <2>;
 		};
 
 		pwm@b500 {
@@ -837,6 +841,7 @@
 			qcom,channel-id = <4>;
 			qcom,supported-sizes = <6>, <7>, <9>;
 			qcom,ramp-index = <4>;
+			#pwm-cells = <2>;
 		};
 
 		pwm@b600 {
@@ -847,6 +852,7 @@
 			qcom,channel-id = <5>;
 			qcom,supported-sizes = <6>, <7>, <9>;
 			qcom,ramp-index = <5>;
+			#pwm-cells = <2>;
 		};
 
 		regulator@8000 {
