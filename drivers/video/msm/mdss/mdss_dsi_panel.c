@@ -1292,6 +1292,16 @@ static int mdss_dsi_parse_panel_features(struct device_node *np,
 	pr_info("%s: dynamic switch feature enabled: %d\n", __func__,
 		pinfo->mipi.dynamic_switch_enabled);
 
+	if (ctrl->disp_en_gpio <= 0) {
+		ctrl->disp_en_gpio = of_get_named_gpio(
+			np,
+			"qcom,5v-boost-gpio", 0);
+
+		if (!gpio_is_valid(ctrl->disp_en_gpio))
+			pr_err("%s:%d, Disp_en gpio not specified\n",
+					__func__, __LINE__);
+	}
+
 	return 0;
 }
 
