@@ -111,6 +111,7 @@ struct cal_result_t {
  * @enabled:		Store the sensor driver enable status.
  * @delay_msec:		Store the sensor driver delay value. The data unit is
  *			millisecond.
+ * @wakeup:		Indicate if the wake up interrupt has been enabled
  * @sensors_enable:	The handle for enable and disable sensor.
  * @sensors_poll_delay:	The handle for set the sensor polling delay time.
  * @params		The sensor calibrate string format params up to userspace.
@@ -135,6 +136,7 @@ struct sensors_classdev {
 	unsigned int		batch_mode;
 	unsigned int		delay_msec;
 	unsigned int		batch_timeout_ms;
+	unsigned int		wakeup;
 	char			*params;
 	struct cal_result_t	cal_result;
 	/* enable and disable the sensor handle*/
@@ -149,6 +151,8 @@ struct sensors_classdev {
 					unsigned int period_ms,
 					unsigned int timeout_ms);
 	int	(*sensors_flush)(struct sensors_classdev *sensors_cdev);
+	int	(*sensors_enable_wakeup)(struct sensors_classdev *sensors_cdev,
+			unsigned int enable);
 	int	(*sensors_calibrate)(struct sensors_classdev *sensor_cdev,
 					int axis, int apply_now);
 	int	(*sensors_write_cal_params)(struct sensors_classdev
