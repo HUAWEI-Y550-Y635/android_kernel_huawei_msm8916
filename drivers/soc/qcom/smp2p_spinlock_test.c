@@ -363,6 +363,11 @@ static void smp2p_ut_remote_spinlock_adsp(struct seq_file *s)
 	smp2p_ut_remote_spinlock_pid(s, SMP2P_AUDIO_PROC, false);
 }
 
+static void smp2p_ut_remote_spinlock_dsps(struct seq_file *s)
+{
+	smp2p_ut_remote_spinlock_pid(s, SMP2P_SENSOR_PROC, false);
+}
+
 static void smp2p_ut_remote_spinlock_wcnss(struct seq_file *s)
 {
 	smp2p_ut_remote_spinlock_pid(s, SMP2P_WIRELESS_PROC, false);
@@ -487,6 +492,8 @@ static int __init smp2p_debugfs_init(void)
 		smp2p_ut_remote_spinlock_modem);
 	smp2p_debug_create("ut_remote_spinlock_adsp",
 		smp2p_ut_remote_spinlock_adsp);
+	smp2p_debug_create("ut_remote_spinlock_dsps",
+		smp2p_ut_remote_spinlock_dsps);
 	smp2p_debug_create("ut_remote_spinlock_wcnss",
 		smp2p_ut_remote_spinlock_wcnss);
 	smp2p_debug_create("ut_remote_spinlock_rpm",
