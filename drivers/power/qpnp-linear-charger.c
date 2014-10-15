@@ -23,6 +23,7 @@
 #include <linux/qpnp/qpnp-adc.h>
 #include <linux/alarmtimer.h>
 #include <linux/bitops.h>
+#include <linux/leds.h>
 #ifdef CONFIG_HUAWEI_KERNEL
 #include <linux/of_batterydata.h>
 #include<linux/wakelock.h>
@@ -385,6 +386,7 @@ struct vddtrim_map vddtrim_map[] = {
  * @cfg_charger_detect_eoc:	charger can detect end of charging
  * @cfg_disable_vbatdet_based_recharge:	keep VBATDET comparator overriden to
  *				low and VBATDET irq disabled.
+ * @cfg_chgr_led_support:	support charger led work.
  * @cfg_safe_current:		battery safety current setting
  * @cfg_hot_batt_p:		hot battery threshold setting
  * @cfg_cold_batt_p:		eold battery threshold setting
@@ -435,9 +437,10 @@ struct qpnp_lbc_chip {
 	bool				cfg_use_fake_battery;
 	bool				fastchg_on;
 	bool				cfg_use_external_charger;
+	bool				cfg_chgr_led_support;
 #ifdef CONFIG_HUAWEI_KERNEL
 	bool				use_other_charger;
-    bool                use_only_ti_charger;
+    	bool                		use_only_ti_charger;
 	bool				resuming_charging;
 	char				log_buf[LOG_BUF_LENGTH];
 #endif
@@ -501,6 +504,7 @@ struct qpnp_lbc_chip {
 	struct qpnp_adc_tm_btm_param	adc_param;
 	struct qpnp_vadc_chip		*vadc_dev;
 	struct qpnp_adc_tm_chip		*adc_tm_dev;
+	struct led_classdev		led_cdev;
 #ifdef CONFIG_HUAWEI_DSM
 	struct delayed_work		check_charging_batt_status_work;
 	struct work_struct		dump_work;
@@ -1625,9 +1629,71 @@ static int qpnp_lbc_tchg_max_set(struct qpnp_lbc_chip *chip, int minutes)
 	return rc;
 }
 
-static int qpnp_lbc_vbatdet_override(struct qpnp_lbc_chip *chip, int ovr_val)
+#define LBC_CHGR_LED	0x4D
+#define CHGR_LED_ON	BIT(0)
+#define CHGR_LED_OFF	0x0
+#define CHGR_LED_STAT_MASK	LBC_MASK(1, 0)
+static void qpnp_lbc_chgr_led_brightness_set(struct led_classdev *cdev,
+		enum led_brightness value)
+{
+	struct qpnp_lbc_chip *chip = container_of(cdev, struct qpnp_lbc_chip,
+			led_cdev);
+	u8 reg;
+	int rc;
+
+	if (value > LED_FULL)
+		value = LED_FULL;
+
+	pr_debug("set the charger led brightness to value=%d\n", value);
+	reg = (value > LED_OFF) ? CHGR_LED_ON : CHGR_LED_OFF;
+
+	rc = qpnp_lbc_masked_write(chip, chip->chgr_base + LBC_CHGR_LED,
+				CHGR_LED_STAT_MASK, reg);
+	if (rc)
+		pr_err("Failed to write charger led rc=%d\n", rc);
+}
+
+static enum
+led_brightness qpnp_lbc_chgr_led_brightness_get(struct led_classdev *cdev)
+{
+
+	struct qpnp_lbc_chip *chip = container_of(cdev, struct qpnp_lbc_chip,
+			led_cdev);
+	u8 reg_val, chgr_led_sts;
+	int rc;
+
+	rc = qpnp_lbc_read(chip, chip->chgr_base + LBC_CHGR_LED,
+				&reg_val, 1);
+	if (rc) {
+		pr_err("Failed to read charger led rc=%d\n", rc);
+		return rc;
+	}
+
+	chgr_led_sts = reg_val & CHGR_LED_STAT_MASK;
+	pr_debug("charger led brightness chgr_led_sts=%d\n", chgr_led_sts);
+
+	return (chgr_led_sts == CHGR_LED_ON) ? LED_FULL : LED_OFF;
+}
+
+static int qpnp_lbc_register_chgr_led(struct qpnp_lbc_chip *chip)
 {
 	int rc;
+
+	chip->led_cdev.name = "red";
+	chip->led_cdev.brightness_set = qpnp_lbc_chgr_led_brightness_set;
+	chip->led_cdev.brightness_get = qpnp_lbc_chgr_led_brightness_get;
+
+	rc = led_classdev_register(chip->dev, &chip->led_cdev);
+	if (rc)
+		dev_err(chip->dev, "unable to register charger led, rc=%d\n",
+				rc);
+
+	return rc;
+};
+
+static int qpnp_lbc_vbatdet_override(struct qpnp_lbc_chip *chip, int ovr_val)
+{
+	int rc;/* Disable charging when faking battery values */
 	u8 reg_val;
 	struct spmi_device *spmi = chip->spmi;
 	unsigned long flags;
@@ -3620,6 +3686,12 @@ static int qpnp_charger_read_dt_props(struct qpnp_lbc_chip *chip)
 	chip->cfg_disable_vbatdet_based_recharge =
 			of_property_read_bool(chip->spmi->dev.of_node,
 					"qcom,disable-vbatdet-based-recharge");
+
+	/* Get the charger led support property */
+	chip->cfg_chgr_led_support =
+			of_property_read_bool(chip->spmi->dev.of_node,
+					"qcom,chgr-led-support");
+
 	/* Disable charging when faking battery values */
 	if (chip->cfg_use_fake_battery)
 		chip->cfg_charging_disabled = true;
@@ -5585,7 +5657,13 @@ static int qpnp_lbc_probe(struct spmi_device *spmi)
 		pr_err("unable to initialize LBC USB path rc=%d\n", rc);
 		return rc;
 	}
-
+	if (chip->cfg_chgr_led_support) {
+		rc = qpnp_lbc_register_chgr_led(chip);
+		if (rc) {
+			pr_err("unable to register charger led rc=%d\n", rc);
+			return rc;
+		}
+	}
 #ifdef CONFIG_HUAWEI_KERNEL
 	chip->ti_charger = NULL;
 	chip->maxim_charger = NULL;
