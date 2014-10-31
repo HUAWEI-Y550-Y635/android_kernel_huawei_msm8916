@@ -1249,7 +1249,8 @@ static void wcd_cpe_svc_event_cb(const struct cpe_svc_notification *param)
 	core = wcd_cpe_get_core_handle(codec);
 
 	dev_dbg(core->dev,
-		"%s: event = 0x%x\n", __func__, param->event);
+		"%s: event = 0x%x, ssr_type = 0x%x\n",
+		__func__, param->event, core->ssr_type);
 
 	switch (param->event) {
 	case CPE_SVC_BOOT:
@@ -1277,7 +1278,14 @@ static void wcd_cpe_svc_event_cb(const struct cpe_svc_notification *param)
 		break;
 	case CPE_SVC_CMI_CLIENTS_DEREG:
 
-		if (core->ssr_type == WCD_CPE_SSR_EVENT)
+		/*
+		 * Only when either CPE SSR is in progress,
+		 * or the bus is down, we need to mark the CPE
+		 * as ready. In all other cases, this event is
+		 * ignored
+		 */
+		if (core->ssr_type == WCD_CPE_SSR_EVENT ||
+		    core->ssr_type == WCD_CPE_BUS_DOWN_EVENT)
 			wcd_cpe_set_and_complete(core,
 						 WCD_CPE_BLK_READY);
 		break;
