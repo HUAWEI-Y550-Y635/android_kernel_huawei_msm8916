@@ -145,6 +145,25 @@ config SSM
 	  This driver uses Secure Channel Manager interface for trustzone
 	  communication and communicates with modem over SMD channel.
 
+config MSM_MHI
+	tristate "Modem Host Interface Driver"
+	help
+	  This kernel module is used to interact with PCIe endpoints
+	  supporting MHI protocol. MHI is a data transmission protocol
+	  involving communication between a host and a device over shared
+	  memory. The MHI driver manages the shared memory by use of logical
+	  unidirectional channels.
+
+config MSM_MHI_UCI
+	 tristate "MHI Usperspace Control Interface Driver"
+	 depends on MSM_MHI
+	 help
+	  This modules enables userspace software clients to communicate
+	  with devices supporting the MHI protocol. Userspace clients
+	  may open the device nodes exposed by MHI UCI and perform
+	  read, write and ioctl operations to communicate with the
+	  attached device.
+
 config QCA1530
 	tristate "QCA1530 SoC GNSS Driver"
 	depends on REGULATOR && OF
@@ -161,6 +180,7 @@ config QCA1530
 
 config PFT
 	bool "Per-File-Tagger driver"
+	depends on SECURITY
 	default n
 	help
 		This driver is used for tagging enterprise files.
@@ -193,4 +213,45 @@ config BUS_TOPOLOGY_ADHOC
 		directionality of connections by explicitly listing device connections
 		thus avoiding illegal routes.
 
+config DEBUG_BUS_VOTER
+	bool "direct client to vote bus clocks for debugging purposes"
+	depends on BUS_TOPOLOGY_ADHOC
+	default n
+	help
+		This option enables a driver that allows putting in a bus clock vote.
+		This driver allows clients to use the bus scaling driver to put in a
+		floor vote on bus clocks. This feature is meant to be a shortcut to directly
+		put in a vote for bus clocks instead of using the bus scaling APIs which deal
+		with topology end points and not bus clocks directly.
+
+config I2C_MSM_PROF_DBG
+	tristate "I2C_MSM_PROF_DBG"
+	depends on ARCH_MSM && I2C_MSM_V2
+	help
+	  This option enables the enhanced logging, profiling and debugfs
+	  support to the i2c-msm-v2 driver. If you say yes to this option,
+	  you can change the deugging level to adjust the amount of debugging
+	  information as needed at run time using debugfs.
+
+	  This module can also be dynamically linked as a shared kernel object.
+
+config MSM_UIM_HSL
+	tristate "User Indentification Module (UIM) on UART High Speed"
+	help
+	  If you say yes to this option, support will be included for the
+	  built-in UIM interface on Qualcomm MSM family processors.
+
+config QPNP_HAPTIC
+	tristate "Haptic support for QPNP PMIC"
+	depends on OF_SPMI
+	help
+	  This option enables device driver support for the Haptic
+	  on the Qualcomm Technologies' QPNP PMICs. It uses the android
+	  timed-output framework.
+
+config SEEMP_CORE
+	tristate "SEEMP Core"
+	help
+		This option enables malware protection component
+		to log on-device software API activity.
 endmenu
