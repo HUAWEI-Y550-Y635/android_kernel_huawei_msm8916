@@ -31,6 +31,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_gpio.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>
 
 #define ACCEL_INPUT_DEV_NAME		"accelerometer"
 #define MMA8451_ID			0x1A
@@ -911,7 +912,7 @@ static int mma8x5x_probe(struct i2c_client *client,
 	} else {
 		INIT_DELAYED_WORK(&pdata->dwork, mma8x5x_dev_poll);
 	}
-	idev = input_allocate_device();
+	idev = devm_input_allocate_device(&client->dev);
 	if (!idev) {
 		result = -ENOMEM;
 		dev_err(&client->dev, "alloc input device failed!\n");
@@ -928,7 +929,7 @@ static int mma8x5x_probe(struct i2c_client *client,
 	result = input_register_device(idev);
 	if (result) {
 		dev_err(&client->dev, "register input device failed!\n");
-		goto err_register_device;
+		goto err_alloc_poll_device;
 	}
 	pdata->idev = idev;
 
@@ -936,7 +937,7 @@ static int mma8x5x_probe(struct i2c_client *client,
 	if (result) {
 		dev_err(&client->dev, "create device file failed!\n");
 		result = -EINVAL;
-		goto err_create_sysfs;
+		goto err_alloc_poll_device;
 	}
 	pdata->cdev = sensors_cdev;
 	pdata->cdev.min_delay = POLL_INTERVAL_MIN * 1000;
@@ -956,10 +957,6 @@ static int mma8x5x_probe(struct i2c_client *client,
 	return 0;
 err_create_class_sysfs:
 	sysfs_remove_group(&idev->dev.kobj, &mma8x5x_attr_group);
-err_create_sysfs:
-	input_unregister_device(idev);
-err_register_device:
-	input_free_device(idev);
 err_alloc_poll_device:
 err_register_irq:
 	if (pdata->use_int)
@@ -989,8 +986,6 @@ static int mma8x5x_remove(struct i2c_client *client)
 			if (gpio_is_valid(pdata->int_pin))
 				gpio_free(pdata->int_pin);
 		}
-		input_unregister_device(idev);
-		input_free_device(idev);
 		kfree(pdata);
 	}
 	mma8x5x_config_regulator(client, 0);
