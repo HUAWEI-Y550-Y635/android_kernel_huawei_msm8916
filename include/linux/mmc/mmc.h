@@ -297,6 +297,9 @@ struct _mmc_csd {
  */
 #define EXT_CSD_SAMSUNG_FEATURE         64      /* RO */
 
+#define EXT_CSD_BKOPS_EN_MANUAL_EN	BIT(0)
+#define EXT_CSD_BKOPS_EN_AUTO_EN	BIT(1)
+
 #define EXT_CSD_WR_REL_PARAM_EN		(1<<2)
 
 #define EXT_CSD_BOOT_WP_B_PWR_WP_DIS	(0x40)
