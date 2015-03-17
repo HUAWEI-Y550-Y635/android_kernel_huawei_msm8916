@@ -1138,7 +1138,7 @@
 		qcom,proxy-clock-names = "core_clk", "iface_clk", "bus_clk";
 
 		qcom,pas-id = <9>;
-		qcom,proxy-timeout-ms = <5000>;
+		qcom,proxy-timeout-ms = <100>;
 		qcom,firmware-name = "venus";
 		linux,contiguous-region = <&venus_mem>;
 	};
