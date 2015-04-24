@@ -4881,7 +4881,7 @@ static void bma2x2_report_axis_data(struct bma2x2_data *bma2x2)
 	ktime_t ts;
 	int err;
 
-	ts = ktime_get();
+	ts = ktime_get_boottime();
 	err = bma2x2_read_accel_xyz(bma2x2->bma2x2_client,
 			bma2x2->sensor_type, &acc);
 	if (err < 0) {
