@@ -60,6 +60,11 @@ struct mdss_hw_settings {
 	u32 val;
 };
 
+struct mdss_max_bw_settings {
+	u32 mdss_max_bw_mode;
+	u32 mdss_max_bw_val;
+};
+
 struct mdss_debug_inf {
 	void *debug_data;
 	int (*debug_dump_stats)(void *data, char *buf, int len);
@@ -237,6 +242,10 @@ struct mdss_data_type {
 	u64 ab_rt[MDSS_MAX_HW_BLK];
 	u64 ab_nrt[MDSS_MAX_HW_BLK];
 	u64 ib[MDSS_MAX_HW_BLK];
+
+	struct mdss_max_bw_settings *max_bw_settings;
+	u32 bw_mode_bitmap;
+	u32 max_bw_settings_cnt;
 };
 extern struct mdss_data_type *mdss_res;
 
