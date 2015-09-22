@@ -20,10 +20,18 @@ Optional properties:
 - qcom,reg-presets : list of offset-value pairs for registers to be written.
   The offsets are from the base offset specified in 'reg'. This is mainly
   used for QoS, VBIF, etc. presets for video.
+- qcom,qdss-presets : list of physical address and memory allocation size pairs.
+  when fw_debug_mode is set as HFI_DEBUG_MODE_QDSS, all firmware messages will be
+  written to QDSS memory.
 - qcom,msm-bus-clients : list of bus clients/consumer each listed as a node.
   The format of the node should follow the layout specified by the bus provider
   for bus consumers at Documentation/devicetree/bindings/arm/msm/msm_bus.txt.
   In addition to the properties specified by the bus provider client also needs
+	- qcom,bus-passive: A bool indicating the bus is "not active".  Active
+	  buses are defined as buses that are scaled according to hardware load.
+	  Passive buses are not scaled by load and are typically just "turned on"
+	  to keep certain clocks (that aren't directly controllable by the driver)
+	  high.
         - qcom,bus-configs: A bitmap that describes the configuration of the
           bus. The bitmaps are as follows:
           supports mvc encoder = 0x00000001
@@ -81,9 +89,6 @@ Optional properties:
           internal cmd queue = 0x800
 - *-supply: A phandle pointing to the appropriate regulator. Number of
   regulators vary across targets.
-- qcom,clock-names: an array of clocks that the driver is supposed to be
-  manipulating. The clocks names here correspond to the clock names used in
-  clk_get(<name>).
 - clock-names: an array of clocks that the driver is supposed to be
   manipulating. The clocks names here correspond to the clock names used in
   clk_get(<name>).
@@ -97,6 +102,9 @@ Optional properties:
   gate-able = 0x2 (if the driver should disable the clock if no load)
 - qcom,sw-power-collapse = A bool indicating if video hardware core can be
   power collapsed in idle state.
+- qcom,early-fw-load = A bool indicating if video firmware should be loaded
+  during probe. When no video session is active, the video hardware will be
+  power collapsed.
 - qcom,use-non-secure-pil = A bool indicating which type of pil to use to load
   the fw.
 - qcom,use-dynamic-bw-update = A bool indicating whether dynamic bandwidth
@@ -104,8 +112,8 @@ Optional properties:
 - qcom,fw-bias = The address at which venus fw is loaded (manually).
 - qcom,enable-idle-indicator = A bool to enable video hardware to generate
   idle message when it is in idle state.
-- qcom,enable-minimum-voting = A bool to limit the bandwidth vote to the
-  lowest vector over an active session.
+- qcom,pm-qos-latency-us = The latency used to vote for QOS power manager. This
+value is typically max(latencies of every cluster at all power levels) + 1
 
 Example:
 
@@ -128,11 +136,13 @@ Example:
 		qcom,hfi = "venus";
 		qcom,reg-presets = <0x80004 0x1>,
 			<0x80178 0x00001FFF>;
+		qcom,qdss-presets = <0xFC307000 0x1000>,
+			<0xFC322000 0x1000>;
 		qcom,max-hw-load = <1224450>; /* 4k @ 30 + 1080p @ 30*/
-		qcom,clock-names = "foo_clk", "bar_clk", "baz_clk";
 		clock-names = "foo_clk", "bar_clk", "baz_clk";
 		qcom,clock-configs = <0x3 0x1 0x0>;
 		qcom,sw-power-collapse;
+		qcom,early-fw-load;
 		qcom,enable-idle-indicator;
 		qcom,msm-bus-clients {
 			qcom,msm-bus-client@0 {
@@ -154,6 +164,7 @@ Example:
 					<63 512 0 0>,
 					<63 512 104000 303000>;
 				qcom,bus-configs = <0xf>;
+				qcom,bus-passive;
 			};
 		};
 		qcom,vidc-iommu-domains {
