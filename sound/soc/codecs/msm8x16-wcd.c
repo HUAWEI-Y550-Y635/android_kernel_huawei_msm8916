@@ -4508,12 +4508,7 @@ static int msm8x16_wcd_spmi_probe(struct spmi_device *spmi)
 		__func__, __LINE__,  spmi->sid);
 
 	modem_state = apr_get_modem_state();
-	if (modem_state != APR_SUBSYS_LOADED) {
-		get_monotonic_boottime(&ts);
-		if(ts.tv_sec >= DSM_REPORT_DELAY_TIME) 
-		{
-			audio_dsm_report_num(DSM_AUDIO_ADSP_SETUP_FAIL_ERROR_NO, DSM_AUDIO_MESG_MEDOM_LOAD_FAIL);
-		}
+	if (modem_state == APR_SUBSYS_DOWN) {
 		dev_dbg(&spmi->dev, "Modem is not loaded yet %d\n",
 				modem_state);
 		return -EPROBE_DEFER;
