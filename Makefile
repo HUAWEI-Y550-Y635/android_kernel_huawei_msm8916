@@ -361,6 +361,7 @@ endif
 USERINCLUDE    := \
 		-I$(srctree)/arch/$(hdr-arch)/include/uapi \
 		-Iarch/$(hdr-arch)/include/generated/uapi \
+		-I$(srctree)/drivers/soc/qcom \
 		-I$(srctree)/include/uapi \
 		-Iinclude/generated/uapi \
 		-Isound/soc/codecs \
