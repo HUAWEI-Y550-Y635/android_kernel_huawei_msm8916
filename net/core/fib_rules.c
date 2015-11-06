@@ -17,11 +17,6 @@
 #include <net/sock.h>
 #include <net/fib_rules.h>
 
-#define uid_valid(uid) ((uid) != -1)
-#define uid_lte(a, b) ((a) <= (b))
-#define uid_eq(a, b) ((a) == (b))
-#define uid_gte(a, b) ((a) >= (b))
-
 int fib_default_rule_add(struct fib_rules_ops *ops,
 			 u32 pref, u32 table, u32 flags)
 {
@@ -186,14 +181,14 @@ void fib_rules_unregister(struct fib_rules_ops *ops)
 }
 EXPORT_SYMBOL_GPL(fib_rules_unregister);
 
-static inline uid_t fib_nl_uid(struct nlattr *nla)
+static inline kuid_t fib_nl_uid(struct nlattr *nla)
 {
-	return nla_get_u32(nla);
+	return make_kuid(current_user_ns(), nla_get_u32(nla));
 }
 
-static int nla_put_uid(struct sk_buff *skb, int idx, uid_t uid)
+static int nla_put_uid(struct sk_buff *skb, int idx, kuid_t uid)
 {
-	return nla_put_u32(skb, idx, uid);
+	return nla_put_u32(skb, idx, from_kuid_munged(current_user_ns(), uid));
 }
 
 static int fib_uid_range_match(struct flowi *fl, struct fib_rule *rule)
@@ -629,15 +624,12 @@ static int fib_nl_fill_rule(struct sk_buff *skb, struct fib_rule *rule,
 	    ((rule->mark_mask || rule->mark) &&
 	     nla_put_u32(skb, FRA_FWMASK, rule->mark_mask)) ||
 	    (rule->target &&
-	     nla_put_u32(skb, FRA_GOTO, rule->target)))
+	     nla_put_u32(skb, FRA_GOTO, rule->target)) ||
+	    (uid_valid(rule->uid_start) &&
+	     nla_put_uid(skb, FRA_UID_START, rule->uid_start)) ||
+	    (uid_valid(rule->uid_end) &&
+	     nla_put_uid(skb, FRA_UID_END, rule->uid_end)))
 		goto nla_put_failure;
-
-	if (uid_valid(rule->uid_start))
-	     nla_put_uid(skb, FRA_UID_START, rule->uid_start);
-
-	if (uid_valid(rule->uid_end))
-	     nla_put_uid(skb, FRA_UID_END, rule->uid_end);
-
 	if (ops->fill(rule, skb, frh) < 0)
 		goto nla_put_failure;
 
@@ -653,15 +645,17 @@ static int dump_rules(struct sk_buff *skb, struct netlink_callback *cb,
 {
 	int idx = 0;
 	struct fib_rule *rule;
+	int err = 0;
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(rule, &ops->rules_list, list) {
 		if (idx < cb->args[1])
 			goto skip;
 
-		if (fib_nl_fill_rule(skb, rule, NETLINK_CB(cb->skb).portid,
-				     cb->nlh->nlmsg_seq, RTM_NEWRULE,
-				     NLM_F_MULTI, ops) < 0)
+		err = fib_nl_fill_rule(skb, rule, NETLINK_CB(cb->skb).portid,
+				       cb->nlh->nlmsg_seq, RTM_NEWRULE,
+				       NLM_F_MULTI, ops);
+		if (err < 0)
 			break;
 skip:
 		idx++;
@@ -670,7 +664,7 @@ skip:
 	cb->args[1] = idx;
 	rules_ops_put(ops);
 
-	return skb->len;
+	return err;
 }
 
 static int fib_nl_dumprule(struct sk_buff *skb, struct netlink_callback *cb)
@@ -686,7 +680,9 @@ static int fib_nl_dumprule(struct sk_buff *skb, struct netlink_callback *cb)
 		if (ops == NULL)
 			return -EAFNOSUPPORT;
 
-		return dump_rules(skb, cb, ops);
+		dump_rules(skb, cb, ops);
+
+		return skb->len;
 	}
 
 	rcu_read_lock();
