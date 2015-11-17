@@ -376,13 +376,7 @@ static bool q6asm_is_valid_audio_client(struct audio_client *ac)
 	for (n = 1; n <= SESSION_MAX; n++) {
 		if (session[n] == ac)
 			return 1;
-	}static uint32_t q6asm_get_next_buf(uint32_t curr_buf, uint32_t max_buf_cnt)
-+{
-+	pr_debug("%s: curr_buf = %d, max_buf_cnt = %d\n",
-+		 __func__, curr_buf, max_buf_cnt);
-+	curr_buf += 1;
-+	return (curr_buf >= max_buf_cnt) ? 0 : curr_buf;
-+}
+	}
 	return 0;
 }
 
