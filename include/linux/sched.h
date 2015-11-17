@@ -1283,10 +1283,6 @@ struct task_struct {
 	cputime_t utime, stime, utimescaled, stimescaled;
 	cputime_t gtime;
 	unsigned long long cpu_power;
-<<<<<<< HEAD
-
-=======
->>>>>>> 74d9c5f... sched: cpufreq: Adds a field cpu_power in the task_struct
 #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
 	struct cputime prev_cputime;
 #endif
