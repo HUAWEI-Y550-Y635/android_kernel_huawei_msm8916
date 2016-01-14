@@ -79,6 +79,9 @@ obj-$(CONFIG_SENSORS_BMA2X2)	+= bstclass.o
 
 obj-$(CONFIG_SENSORS_BMA2X2)	+= bma2x2.o
 obj-$(CONFIG_HUAWEI_SENSOR_SELF_ADAPT) += hw_sensor_info.o
+
+obj-$(CONFIG_HUAWEI_ACCEL_SENSORS_KIONIX)		+= kionix_accel_hw.o
+
 ifeq ($(CONFIG_SENSORS_BMA2X2_ENABLE_INT1),y)
 	EXTRA_CFLAGS += -DBMA2X2_ENABLE_INT1
 endif
