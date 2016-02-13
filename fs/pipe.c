@@ -397,6 +397,7 @@ pipe_read(struct kiocb *iocb, const struct iovec *_iov,
 			void *addr;
 			size_t chars = buf->len;
 			int error, atomic;
+			int offset;
 
 			if (chars > total_len)
 				chars = total_len;
@@ -409,9 +410,18 @@ pipe_read(struct kiocb *iocb, const struct iovec *_iov,
 			}
 
 			atomic = !iov_fault_in_pages_write(iov, chars);
+<<<<<<< HEAD
 redo:
 			addr = ops->map(pipe, buf, atomic);
 			error = pipe_iov_copy_to_user(iov, addr + buf->offset, chars, atomic);
+=======
+			remaining = chars;
+			offset = buf->offset;
+redo:
+			addr = ops->map(pipe, buf, atomic);
+			error = pipe_iov_copy_to_user(iov, addr, &offset,
+						      &remaining, atomic);
+>>>>>>> 1d872b7... pipe: Fix buffer offset after partially failed read
 			ops->unmap(pipe, buf, addr);
 			if (unlikely(error)) {
 				/*
