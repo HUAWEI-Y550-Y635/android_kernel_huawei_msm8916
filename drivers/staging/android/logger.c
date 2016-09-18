@@ -1006,20 +1006,23 @@ EXPORT_SYMBOL(log_to_jank);
 static int __init logger_init(void)
 {
 	int ret;
-
-	ret = create_log(LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*512);
+#if defined(CONFIG_HUAWEI_KERNEL)
+	struct logger_log *log;
+#endif
+	
+	ret = create_log(LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*1024);
 	if (unlikely(ret))
 		goto out;
 
-	ret = create_log(LOGGER_LOG_EVENTS, CONFIG_LOGCAT_SIZE*512);
+	ret = create_log(LOGGER_LOG_EVENTS, CONFIG_LOGCAT_SIZE*1024);
 	if (unlikely(ret))
 		goto out;
 
-	ret = create_log(LOGGER_LOG_RADIO, CONFIG_LOGCAT_SIZE*512);
+	ret = create_log(LOGGER_LOG_RADIO, CONFIG_LOGCAT_SIZE*1024);
 	if (unlikely(ret))
 		goto out;
 
-	ret = create_log(LOGGER_LOG_SYSTEM, CONFIG_LOGCAT_SIZE*512);
+	ret = create_log(LOGGER_LOG_SYSTEM, CONFIG_LOGCAT_SIZE*1024);
 	if (unlikely(ret))
 		goto out;
 #ifdef CONFIG_HUAWEI_KERNEL
@@ -1068,3 +1071,4 @@ module_exit(logger_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Robert Love, <rlove@google.com>");
 MODULE_DESCRIPTION("Android Logger");
+
