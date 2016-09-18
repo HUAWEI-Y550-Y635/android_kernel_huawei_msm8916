@@ -806,3 +806,4 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 extern char *mach_panic_string;
 
 #endif
+
