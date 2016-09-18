@@ -218,11 +218,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
 
 	if (esr & ESR_LNX_EXEC) {
 		vm_flags = VM_EXEC;
-<<<<<<< HEAD
 	} else if (esr & ESR_WRITE) {
-=======
-	} else if ((esr & ESR_WRITE) && !(esr & ESR_CM)) {
->>>>>>> 6944fb8... Linux 3.10.61
 		vm_flags = VM_WRITE;
 		mm_flags |= FAULT_FLAG_WRITE;
 	}
