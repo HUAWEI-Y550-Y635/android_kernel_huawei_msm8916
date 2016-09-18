@@ -484,14 +484,10 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size,
 	page_start = start - offset_in_page(start);
 	page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
 
-<<<<<<< HEAD
-	prot = pgprot_noncached(PAGE_KERNEL);
-=======
 	if (memtype)
 		prot = pgprot_noncached(PAGE_KERNEL);
 	else
 		prot = pgprot_writecombine(PAGE_KERNEL);
->>>>>>> 4ea0b09... Linux 3.10.65
 
 	pages = kmalloc(sizeof(struct page *) * page_count, GFP_KERNEL);
 	if (!pages) {
@@ -521,16 +517,12 @@ static void *persistent_ram_iomap(phys_addr_t start, size_t size,
 		return NULL;
 	}
 
-<<<<<<< HEAD
-	return ioremap(start, size);
-=======
 	if (memtype)
 		va = ioremap(start, size);
 	else
 		va = ioremap_wc(start, size);
 
 	return va;
->>>>>>> 4ea0b09... Linux 3.10.65
 }
 
 static int persistent_ram_buffer_map(phys_addr_t start, phys_addr_t size,
