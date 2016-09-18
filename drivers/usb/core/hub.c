@@ -4829,19 +4829,6 @@ static void hub_events(void)
 
 		hub = list_entry(tmp, struct usb_hub, event_list);
 		kref_get(&hub->kref);
-<<<<<<< HEAD
-=======
-
-		/* make sure hdev is not freed before accessing it */
-		if (hub->disconnected) {
-			spin_unlock_irq(&hub_event_lock);
-			goto hub_disconnected;
-		} else {
-			usb_get_dev(hub->hdev);
-		}
-		hdev = hub->hdev;
-		usb_get_dev(hdev);
->>>>>>> 1cfca4a... Linux 3.10.56
 		spin_unlock_irq(&hub_event_lock);
 
 		hub_dev = hub->intfdev;
