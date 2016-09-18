@@ -1006,16 +1006,8 @@ EXPORT_SYMBOL(log_to_jank);
 static int __init logger_init(void)
 {
 	int ret;
-<<<<<<< HEAD
-#if defined(CONFIG_HUAWEI_KERNEL)
-	struct logger_log *log;
-#endif
-	
-	ret = create_log(LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*1024);
-=======
 
 	ret = create_log(LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*512);
->>>>>>> f82a668... More RAM!
 	if (unlikely(ret))
 		goto out;
 
