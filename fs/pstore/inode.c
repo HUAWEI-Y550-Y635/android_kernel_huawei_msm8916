@@ -316,17 +316,10 @@ int pstore_mkfile(enum pstore_type_id type, char *psname, u64 id, int count,
 		sprintf(name, "dmesg-%s-%lld", psname, id);
 		break;
 	case PSTORE_TYPE_CONSOLE:
-<<<<<<< HEAD
 		sprintf(name, "console-%s", psname);
 		break;
 	case PSTORE_TYPE_FTRACE:
 		sprintf(name, "ftrace-%s", psname);
-=======
-		snprintf(name, PSTORE_NAMELEN, "console-%s-%lld", psname, id);
-		break;
-	case PSTORE_TYPE_FTRACE:
-		snprintf(name, PSTORE_NAMELEN, "ftrace-%s-%lld", psname, id);
->>>>>>> aca3eea... Linux 3.10.60
 		break;
 	case PSTORE_TYPE_MCE:
 		sprintf(name, "mce-%s-%lld", psname, id);
@@ -337,7 +330,7 @@ int pstore_mkfile(enum pstore_type_id type, char *psname, u64 id, int count,
 	default:
 		sprintf(name, "type%d-%s-%lld", type, psname, id);
 		break;
-	}
+}
 
 	mutex_lock(&root->d_inode->i_mutex);
 
