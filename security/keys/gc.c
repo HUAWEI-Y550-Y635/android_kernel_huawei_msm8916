@@ -209,13 +209,6 @@ static noinline void key_gc_unused_keys(struct list_head *keys)
 
 		key_user_put(key->user);
 
-<<<<<<< HEAD
-		/* now throw away the key memory */
-		if (key->type->destroy)
-			key->type->destroy(key);
-
-=======
->>>>>>> 2c29e70... Linux 3.10.95
 		kfree(key->description);
 
 #ifdef KEY_DEBUGGING
