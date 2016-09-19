@@ -1136,6 +1136,11 @@ config SUPPORT_CHERRY_L04
 	depends on HUAWEI_KERNEL && ARCH_MSM8916
 	default n
 
+config SUPPORT_Y550
+	bool "Support for Y550"
+	depends on HUAWEI_KERNEL && ARCH_MSM8916
+	default n
+
 config SUPPORT_Y635
 	bool "Support for Y635"
 	depends on HUAWEI_KERNEL && ARCH_MSM8916
