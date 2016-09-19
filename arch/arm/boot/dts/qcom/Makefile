@@ -109,6 +109,18 @@ ifeq ($(CONFIG_SUPPORT_CHERRY_L04),y)
 dtb-$(CONFIG_ARCH_MSM8916) += \
 	huawei_cherry_l04_va.dtb
 endif
+ifeq ($(CONFIG_SUPPORT_Y550),y)
+dtb-$(CONFIG_ARCH_MSM8916) += \
+        huawei_y550_l01_va.dtb \
+        huawei_y550_l01_vb.dtb \
+        huawei_y550_l01_vc.dtb \
+        huawei_y550_l02_va.dtb \
+        huawei_y550_l02_vb.dtb \
+        huawei_y550_l02_vc.dtb \
+        huawei_y550_l03_va.dtb \
+        huawei_y550_l03_vb.dtb \
+        huawei_y550_l03_vc.dtb
+endif
 ifeq ($(CONFIG_SUPPORT_Y635),y)
 dtb-$(CONFIG_ARCH_MSM8916) += \
 	huawei_y635_l01_va.dtb \
