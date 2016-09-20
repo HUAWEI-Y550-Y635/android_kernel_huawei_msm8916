@@ -1,5 +1,5 @@
  /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,12 +23,16 @@
 #define RMNET_EGRESS_FORMAT_MAP                 (1<<1)
 #define RMNET_EGRESS_FORMAT_AGGREGATION         (1<<2)
 #define RMNET_EGRESS_FORMAT_MUXING              (1<<3)
+#define RMNET_EGRESS_FORMAT_MAP_CKSUMV3         (1<<4)
+#define RMNET_EGRESS_FORMAT_MAP_CKSUMV4         (1<<5)
 
 #define RMNET_INGRESS_FIX_ETHERNET              (1<<0)
 #define RMNET_INGRESS_FORMAT_MAP                (1<<1)
 #define RMNET_INGRESS_FORMAT_DEAGGREGATION      (1<<2)
 #define RMNET_INGRESS_FORMAT_DEMUXING           (1<<3)
 #define RMNET_INGRESS_FORMAT_MAP_COMMANDS       (1<<4)
+#define RMNET_INGRESS_FORMAT_MAP_CKSUMV3        (1<<5)
+#define RMNET_INGRESS_FORMAT_MAP_CKSUMV4        (1<<6)
 
 /* ***************** Netlink API ******************************************** */
 #define RMNET_NETLINK_PROTO 31
@@ -223,10 +227,14 @@ enum rmnet_netlink_message_types_e {
 };
 
 enum rmnet_config_endpoint_modes_e {
+	/* Pass the frame up the stack with no modifications to skb->dev      */
 	RMNET_EPMODE_NONE,
+	/* Replace skb->dev to a virtual rmnet device and pass up the stack   */
 	RMNET_EPMODE_VND,
+	/* Pass the frame directly to another device with dev_queue_xmit().   */
 	RMNET_EPMODE_BRIDGE,
-	RMNET_EPMODE_LENGTH /* Must be the last item in the list */
+	/* Must be the last item in the list                                  */
+	RMNET_EPMODE_LENGTH
 };
 
 enum rmnet_config_return_codes_e {

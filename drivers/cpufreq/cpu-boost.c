@@ -501,3 +501,4 @@ static int cpu_boost_init(void)
 	return 0;
 }
 late_initcall(cpu_boost_init);
+
