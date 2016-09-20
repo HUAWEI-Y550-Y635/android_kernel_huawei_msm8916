@@ -475,7 +475,7 @@ struct request_queue {
 #define QUEUE_FLAG_DEFAULT	((1 << QUEUE_FLAG_IO_STAT) |		\
 				 (1 << QUEUE_FLAG_STACKABLE)	|	\
 				 (1 << QUEUE_FLAG_SAME_COMP)	|	\
-				 (1 << QUEUE_FLAG_ADD_RANDOM))
+				 (0 << QUEUE_FLAG_ADD_RANDOM))
 
 static inline void queue_lockdep_assert_held(struct request_queue *q)
 {
@@ -1104,7 +1104,7 @@ extern int blk_verify_command(unsigned char *cmd, fmode_t has_write_perm);
 enum blk_default_limits {
 	BLK_MAX_SEGMENTS	= 128,
 	BLK_SAFE_MAX_SECTORS	= 255,
-	BLK_DEF_MAX_SECTORS	= 1024,
+	BLK_DEF_MAX_SECTORS	= 16384,
 	BLK_MAX_SEGMENT_SIZE	= 65536,
 	BLK_SEG_BOUNDARY_MASK	= 0xFFFFFFFFUL,
 };
