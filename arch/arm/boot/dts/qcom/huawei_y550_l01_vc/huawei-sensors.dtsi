@@ -203,7 +203,7 @@
 		vdd-supply = <&pm8916_l17>;
 		vddio-supply = <&pm8916_l6>;
 		/*1 is bottom and others means top*/
-		gs,direct = <1>;
+		gs,direct = <0>;
 		gs,min_interval = <5>;
 		gs,poll_interval = <200>;
 		kionix,use-hrtimer;
