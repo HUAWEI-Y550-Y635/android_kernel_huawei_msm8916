@@ -3,7 +3,6 @@
  *
  * Copyright (C) 2005 John Lenz <lenz@cs.wisc.edu>
  * Copyright (C) 2005-2007 Richard Purdie <rpurdie@openedhand.com>
- * Copyright (C) 2016 @surdu_petru
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -86,26 +85,6 @@ static ssize_t led_max_brightness_show(struct device *dev,
 	return snprintf(buf, LED_BUFF_SIZE, "%u\n", led_cdev->max_brightness);
 }
 
-static ssize_t led_blink_store(struct device *dev,
-	struct device_attribute *attr,
-	const char *buf, size_t size)
-{
-	struct led_classdev *led_cdev = dev_get_drvdata(dev);
-	unsigned long on, off = 1000;
-
-	if (kstrtoul(buf, 10, &on))
-		return -EINVAL;
-
-	if (!on) {
-		led_stop_software_blink(led_cdev);
-	} else {
-		on = 1000;
-		led_blink_set(led_cdev, &on, &off);
-	}
-
-	return size;
-}
-
 static struct device_attribute led_class_attrs[] = {
 	__ATTR(brightness, 0644, led_brightness_show, led_brightness_store),
 	__ATTR(max_brightness, 0644, led_max_brightness_show,
@@ -113,7 +92,6 @@ static struct device_attribute led_class_attrs[] = {
 #ifdef CONFIG_LEDS_TRIGGERS
 	__ATTR(trigger, 0644, led_trigger_show, led_trigger_store),
 #endif
-	__ATTR(blink, 0644, NULL, led_blink_store),
 	__ATTR_NULL,
 };
 
