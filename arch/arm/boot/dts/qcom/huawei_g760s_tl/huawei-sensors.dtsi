@@ -154,7 +154,7 @@
 		vdd-supply = <&pm8916_l17>;
 		vddio-supply = <&pm8916_l6>;
 		gs,int1_gpio = <&msm_gpio 115 0x2002>;
-		gs,direct = <1>;
+		gs,direct = <0>;
 		gs,min_interval = <5>;
 		gs,poll_interval = <200>;
 		gs,accel_direction = <1>;
