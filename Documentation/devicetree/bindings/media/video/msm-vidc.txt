@@ -92,9 +92,6 @@ Optional properties:
           internal cmd queue = 0x800
 - *-supply: A phandle pointing to the appropriate regulator. Number of
   regulators vary across targets.
-- clock-names: an array of clocks that the driver is supposed to be
-  manipulating. The clocks names here correspond to the clock names used in
-  clk_get(<name>).
 - qcom,clock-configs = an array of bitmaps of clocks' configurations. The index
   of the bitmap corresponds to the clock at the same index in qcom,clock-names.
   The bitmaps describes the actions that the device needs to take regarding the
@@ -130,7 +127,6 @@ Example:
 		qcom,qdss-presets = <0xFC307000 0x1000>,
 			<0xFC322000 0x1000>;
 		qcom,max-hw-load = <1224450>; /* 4k @ 30 + 1080p @ 30*/
-		clock-names = "foo_clk", "bar_clk", "baz_clk";
 		qcom,clock-configs = <0x3 0x1 0x0>;
 		qcom,sw-power-collapse;
 		qcom,buffer-type-tz-usage-table = <0x1 0x1>,
