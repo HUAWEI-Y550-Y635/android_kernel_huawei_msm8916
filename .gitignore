@@ -92,7 +92,9 @@ signing_key.priv
 signing_key.x509
 x509.genkey
 
-# needed for huawei y550's touchscreen driver
+# needed for huawei y635's touchscreen driver
+!drivers/input/touchscreen/mstar/*.i
+
 # needed for huawei y550's touchscreen driver
 !drivers/input/touchscreen/focaltech/*.a
 !drivers/input/touchscreen/focaltech/*.i
