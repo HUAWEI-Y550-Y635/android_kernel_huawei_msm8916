@@ -291,15 +291,20 @@ int msm8994_unclamp_secondary_arm_cpu(unsigned int cpu)
 		goto out_acc_reg;
 	}
 
+	/* Bypass LDO */
+	writel_relaxed(0x00000001, ldo_bhs_reg + LDO_BHS_PWR_CTL);
+	mb();
+	udelay(2);
+
 	/* Assert head switch enable few */
 	writel_relaxed(0x00000001, acc_reg + CPU_PWR_GATE_CTL);
 	mb();
-	udelay(1);
+	udelay(2);
 
 	/* Assert head switch enable rest */
 	writel_relaxed(0x00000003, acc_reg + CPU_PWR_GATE_CTL);
 	mb();
-	udelay(1);
+	udelay(2);
 
 	/* De-assert coremem clamp. This is asserted by default */
 	writel_relaxed(0x00000079, acc_reg + CPU_PWR_CTL);
@@ -308,7 +313,7 @@ int msm8994_unclamp_secondary_arm_cpu(unsigned int cpu)
 	/* Close coremem array gdhs */
 	writel_relaxed(0x0000007D, acc_reg + CPU_PWR_CTL);
 	mb();
-	udelay(1);
+	udelay(2);
 
 	/* De-assert clamp */
 	writel_relaxed(0x0000003D, acc_reg + CPU_PWR_CTL);
@@ -317,7 +322,7 @@ int msm8994_unclamp_secondary_arm_cpu(unsigned int cpu)
 	/* De-assert clamp */
 	writel_relaxed(0x0000003C, acc_reg + CPU_PWR_CTL);
 	mb();
-	udelay(1);
+	udelay(2);
 
 	/* De-assert core0 reset */
 	writel_relaxed(0x0000000C, acc_reg + CPU_PWR_CTL);
