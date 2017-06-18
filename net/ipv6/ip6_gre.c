@@ -57,6 +57,7 @@
 #include <net/ip6_tunnel.h>
 #include <net/gre.h>
 
+
 static bool log_ecn_error = true;
 module_param(log_ecn_error, bool, 0644);
 MODULE_PARM_DESC(log_ecn_error, "Log packets received with corrupted ECN");
@@ -396,7 +397,7 @@ static void ip6gre_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 	t = ip6gre_tunnel_lookup(skb->dev, &ipv6h->daddr, &ipv6h->saddr,
 				 key, greh->protocol);
-	if (!t)
+	if (t == NULL)
 		return;
 
 	switch (type) {
