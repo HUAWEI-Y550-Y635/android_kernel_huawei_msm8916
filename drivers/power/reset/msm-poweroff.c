@@ -331,7 +331,6 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x77665524, restart_reason);
 #endif
 		} else {
-			qpnp_pon_set_restart_reason(PON_RESTART_REASON_UNKNOWN);
 			__raw_writel(0x77665501, restart_reason);
 		}
 	}
