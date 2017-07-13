@@ -1,4 +1,4 @@
-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/kallsyms.h>
 #include <linux/slab.h>
+#include <linux/kmemleak.h>
 #include <soc/qcom/memory_dump.h>
 
 #define MISC_DUMP_DATA_LEN		4096
@@ -118,10 +119,12 @@ static void __init common_log_register_log_buf(void)
 		if (fist_idxp) {
 			dump_first_idx.start_addr = virt_to_phys(fist_idxp);
 			if (msm_dump_tbl_register(&dump_first_idx))
-				pr_err("Unable to register %d.\n", dump_first_idx.id);
+				pr_err("Unable to register %d.\n",
+							dump_first_idx.id);
 		}
 	} else {
-		dump_data = kzalloc(sizeof(struct msm_dump_data), GFP_KERNEL);
+		dump_data = kzalloc(sizeof(struct msm_dump_data),
+						GFP_KERNEL);
 		if (!dump_data) {
 			pr_err("Unable to alloc data space.\n");
 			return;
@@ -130,12 +133,16 @@ static void __init common_log_register_log_buf(void)
 		dump_data->addr = virt_to_phys(*log_bufp);
 		entry_log_buf.id = MSM_DUMP_DATA_LOG_BUF;
 		entry_log_buf.addr = virt_to_phys(dump_data);
-		if (msm_dump_data_register(MSM_DUMP_TABLE_APPS, &entry_log_buf)) {
+		if (msm_dump_data_register(MSM_DUMP_TABLE_APPS,
+							&entry_log_buf)) {
 			kfree(dump_data);
 			pr_err("Unable to register %d.\n", entry_log_buf.id);
-		}
+		} else
+			kmemleak_not_leak(dump_data);
+
 		if (fist_idxp) {
-			dump_data = kzalloc(sizeof(struct msm_dump_data), GFP_KERNEL);
+			dump_data = kzalloc(sizeof(struct msm_dump_data),
+							GFP_KERNEL);
 			if (!dump_data) {
 				pr_err("Unable to alloc data space.\n");
 				return;
@@ -143,8 +150,13 @@ static void __init common_log_register_log_buf(void)
 			dump_data->addr = virt_to_phys(fist_idxp);
 			entry_first_idx.id = MSM_DUMP_DATA_LOG_BUF_FIRST_IDX;
 			entry_first_idx.addr = virt_to_phys(dump_data);
-			if (msm_dump_data_register(MSM_DUMP_TABLE_APPS, &entry_first_idx))
-				pr_err("Unable to register %d.\n", entry_first_idx.id);
+			if (msm_dump_data_register(MSM_DUMP_TABLE_APPS,
+						&entry_first_idx)) {
+				kfree(dump_data);
+				pr_err("Unable to register %d.\n",
+						entry_first_idx.id);
+			} else
+				kmemleak_not_leak(dump_data);
 		}
 	}
 }
