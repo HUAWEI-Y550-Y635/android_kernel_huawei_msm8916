@@ -35,7 +35,7 @@
 #define SCSS_CPU1CORE_RESET 0xD80
 #define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
 #define MSM8960_SAW2_BASE_ADDR 0x02089000
-#define MSM8962_SAW2_BASE_ADDR 0xF9089000
+/*#define MSM8962_SAW2_BASE_ADDR 0xF9089000*/
 #define APCS_ALIAS0_BASE_ADDR 0xF9088000
 
 /*
@@ -157,7 +157,7 @@ static int __cpuinit msm8974_release_secondary(unsigned long base,
 	return 0;
 }
 
-static int __cpuinit msm8962_release_secondary(unsigned long base,
+/*static int __cpuinit msm8962_release_secondary(unsigned long base,
 						unsigned int cpu)
 {
 	void *base_ptr = ioremap_nocache(base + (cpu * 0x10000), SZ_4K);
@@ -182,7 +182,7 @@ static int __cpuinit msm8962_release_secondary(unsigned long base,
 	mb();
 	iounmap(base_ptr);
 	return 0;
-}
+}*/
 
 static int __cpuinit arm_release_secondary(unsigned long base, unsigned int cpu)
 {
@@ -307,7 +307,7 @@ int __cpuinit msm8974_boot_secondary(unsigned int cpu, struct task_struct *idle)
 	return release_from_pen(cpu);
 }
 
-int __cpuinit msm8962_boot_secondary(unsigned int cpu, struct task_struct *idle)
+/*int __cpuinit msm8962_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	pr_debug("Starting secondary CPU %d\n", cpu);
 
@@ -320,7 +320,7 @@ int __cpuinit msm8962_boot_secondary(unsigned int cpu, struct task_struct *idle)
 		per_cpu(cold_boot_done, cpu) = true;
 	}
 	return release_from_pen(cpu);
-}
+}*/
 
 static int __cpuinit msm8916_boot_secondary(unsigned int cpu,
 						struct task_struct *idle)
@@ -507,7 +507,7 @@ struct smp_operations msm8974_smp_ops __initdata = {
 #endif
 };
 
-struct smp_operations msm8962_smp_ops __initdata = {
+/*struct smp_operations msm8962_smp_ops __initdata = {
 	.smp_init_cpus = msm_smp_init_cpus,
 	.smp_prepare_cpus = msm_platform_smp_prepare_cpus,
 	.smp_secondary_init = msm_secondary_init,
@@ -516,7 +516,7 @@ struct smp_operations msm8962_smp_ops __initdata = {
 	.cpu_die = msm_cpu_die,
 	.cpu_kill = msm_cpu_kill,
 #endif
-};
+};*/
 
 struct smp_operations msm8960_smp_ops __initdata = {
 	.smp_init_cpus = msm_smp_init_cpus,
