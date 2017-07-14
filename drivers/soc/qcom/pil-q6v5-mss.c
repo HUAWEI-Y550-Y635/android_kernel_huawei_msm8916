@@ -314,8 +314,8 @@ static int modem_ramdump(int enable, const struct subsys_desc *subsys)
 		pr_err("Unable to dump modem fw memory (rc = %d).\n", ret);
 
 	if (drv->q6->mba_virt)
-		dma_free_coherent(&drv->mba_mem_dev, drv->q6->mba_size,
-				drv->q6->mba_virt, drv->q6->mba_phys);
+		dma_free_attrs(&drv->mba_mem_dev, drv->q6->mba_size,
+				drv->q6->mba_virt, drv->q6->mba_phys, &drv->attrs_dma);
 
 	pil_mss_shutdown(&drv->q6->desc);
 	pil_mss_remove_proxy_votes(&drv->q6->desc);
