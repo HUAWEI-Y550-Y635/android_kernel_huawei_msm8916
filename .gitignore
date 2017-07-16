@@ -98,3 +98,4 @@ x509.genkey
 # needed for huawei y550's touchscreen driver
 !drivers/input/touchscreen/focaltech/*.a
 !drivers/input/touchscreen/focaltech/*.i
+!drivers/input/touchscreen/focaltech/focal_scap_test_lib.a
