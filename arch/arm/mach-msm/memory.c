@@ -66,8 +66,8 @@ int __init dt_scan_for_memory_reserve(unsigned long node, const char *uname,
 	int i;
 	int ret;
 #ifdef CONFIG_HUAWEI_KERNEL
-	unsigned int *memory_reserve_huawei_prop;
-	unsigned long memory_reserve_huawei_prop_length;
+	const unsigned int *memory_reserve_huawei_prop;
+	int memory_reserve_huawei_prop_length;
 #endif
 	memory_remove_prop = of_get_flat_dt_prop(node,
 						"qcom,memblock-remove",
