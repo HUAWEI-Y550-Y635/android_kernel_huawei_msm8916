@@ -158,6 +158,41 @@ static u8 *i2c_msm_tag_byte(struct i2c_msm_tag *tag, int byte_n)
 	return ((u8 *)tag) + byte_n;
 }
 
+/*************************************************************
+Description: this fucntion use to set i2c clock frequency
+function name: qup_set_clk_freq
+input:struct i2c_adapter *adap
+               clk_freq
+output:none
+return:none
+****************************************************************/
+void qup_set_clk_freq(struct i2c_adapter *adap, int clk_freq)
+{
+        struct i2c_msm_ctrl *ctrl = i2c_get_adapdata(adap);
+        if(ctrl)
+        {
+            ctrl->rsrcs.clk_freq_out = clk_freq;
+        }
+        return;
+}
+
+/*************************************************************
+Description: this fucntion use to get i2c clock frequency
+function name: qup_set_clk_freq
+input:struct i2c_adapter *adap
+output:none
+return:none
+****************************************************************/
+int qup_get_clk_freq(struct i2c_adapter *adap)
+{
+        struct i2c_msm_ctrl *ctrl = i2c_get_adapdata(adap);
+        if(ctrl)
+        {
+            return ctrl->rsrcs.clk_freq_out;
+        }
+        return 0;
+}
+
 /*
  * i2c_msm_buf_to_ptr: translates a xfer buf to a pointer into the i2c_msg data
  */
