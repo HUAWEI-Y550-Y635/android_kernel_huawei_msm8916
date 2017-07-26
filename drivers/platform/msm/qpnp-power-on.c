@@ -167,6 +167,8 @@ struct qpnp_pon {
 
 static struct qpnp_pon *sys_reset_dev;
 
+bool power_key_ps = false;
+
 static u32 s1_delay[PON_S1_COUNT_MAX + 1] = {
 	0 , 32, 56, 80, 138, 184, 272, 408, 608, 904, 1352, 2048,
 	3072, 4480, 6720, 10256
