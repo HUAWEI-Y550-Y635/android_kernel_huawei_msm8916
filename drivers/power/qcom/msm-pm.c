@@ -392,7 +392,7 @@ static bool msm_pm_power_collapse(bool from_idle)
 			|| (MSM_PM_DEBUG_IDLE_CLK & msm_pm_debug_mask))
 		clock_debug_print_enabled();
 
-#ifdef  CONFIG_HUAWEI_KERNEL
+/*#ifdef  CONFIG_HUAWEI_KERNEL
 	if ((!from_idle && cpu_online(cpu))
 			&& (MSM_PM_DEBUG_GPIO & msm_pm_debug_mask))
 		msm_gpio_print_enabled(); 
@@ -400,7 +400,7 @@ static bool msm_pm_power_collapse(bool from_idle)
 	if ((!from_idle && cpu_online(cpu))
 			&& (MSM_PM_DEBUG_REGULATOR & msm_pm_debug_mask))
 		regulator_debug_print_enabled();
-#endif
+#endif*/
 
 	avsdscr = avs_get_avsdscr();
 	avscsr = avs_get_avscsr();

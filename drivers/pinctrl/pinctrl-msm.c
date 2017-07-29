@@ -58,9 +58,9 @@ struct msm_pinctrl_dd {
 	struct device *dev;
 };
 
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
 extern void msm_cfg_nc_gpio(void);
-#endif
+#endif*/
 
 /**
  * struct msm_irq_of_info: represents of init data for tlmm interrupt
@@ -806,9 +806,9 @@ int msm_pinctrl_probe(struct platform_device *pdev,
 	msm_register_irqchip(dd);
 	platform_set_drvdata(pdev, dd);
 
-#ifdef CONFIG_HUAWEI_KERNEL
+/*#ifdef CONFIG_HUAWEI_KERNEL
 	msm_cfg_nc_gpio();
-#endif
+#endif*/
 		
 	return 0;
 }
