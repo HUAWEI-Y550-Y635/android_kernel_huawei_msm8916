@@ -87,7 +87,7 @@ config ARCH_MSM8916
 	select MAY_HAVE_SPARSE_IRQ
 	select SPARSE_IRQ
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V4
+	select PINCTRL_MSM_TLMM
 	select USE_PINCTRL_IRQ
 	select MSM_PM if PM
 	select MSM_RPM_SMD
@@ -179,7 +179,7 @@ config ARCH_MSMZIRC
 	select QMI_ENCDEC
 	select MSM_CORTEX_A7
 	select PINCTRL
-	select PINCTRL_MSM_TLMM_V4
+	select PINCTRL_MSM_TLMM
 	select MSM_IRQ
 
 config ARCH_MDMFERRUM
