@@ -122,7 +122,7 @@ static int mux_set_rate(struct clk *c, unsigned long rate)
 			rc = clk_set_rate(mux->safe_parent, mux->safe_freq);
 			if (rc) {
 				pr_err("Failed to set safe rate on %s\n",
-					clk_name(mux->safe_parent));
+					mux->safe_parent->dbg_name);
 				return rc;
 			}
 		}
@@ -759,7 +759,7 @@ static int mux_div_clk_set_rate(struct clk *c, unsigned long rate)
 	rc = clk_set_rate(new_parent, new_prate);
 	if (rc) {
 		pr_err("failed to set %s to %ld\n",
-			clk_name(new_parent), new_prate);
+			new_parent->dbg_name, new_prate);
 		goto err_set_rate;
 	}
 
@@ -783,11 +783,11 @@ err_set_src_div:
 err_pre_reparent:
 	rc = clk_set_rate(old_parent, old_prate);
 	WARN(rc, "%s: error changing parent (%s) rate to %ld\n",
-		clk_name(c), clk_name(old_parent), old_prate);
+		c->dbg_name, old_parent->dbg_name, old_prate);
 err_set_rate:
 	rc = set_src_div(md, old_parent, old_div);
 	WARN(rc, "%s: error changing back to original div (%d) and parent (%s)\n",
-		clk_name(c), old_div, clk_name(old_parent));
+		c->dbg_name, old_div, old_parent->dbg_name);
 
 	return rc;
 }
