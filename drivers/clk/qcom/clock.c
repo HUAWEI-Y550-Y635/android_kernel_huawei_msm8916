@@ -561,19 +561,17 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
 	if (IS_ERR_OR_NULL(clk))
 		return -EINVAL;
 
-	for (i = 0; i < clk->num_fmax; i++)
-		fmax = max(fmax, clk->fmax[i]);
-	if (!fmax)
-		fmax = ULONG_MAX;
-	rate = min(rate, fmax);
-
-	if (clk->ops->round_rate)
-		rrate = clk->ops->round_rate(clk, rate);
-	else if (clk->rate)
-		rrate = clk->rate;
-	else
+	if (!clk->ops->round_rate)
 		return -ENOSYS;
 
+	for (i = 0; i < clk->num_fmax; i++)
+		fmax = max(fmax, clk->fmax[i]);
+
+	if (!fmax)
+		fmax = ULONG_MAX;
+
+	rate = min(rate, fmax);
+	rrate = clk->ops->round_rate(clk, rate);
 	if (rrate > fmax)
 		return -EINVAL;
 	return rrate;
