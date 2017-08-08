@@ -411,6 +411,7 @@ static struct mux_clk kpss_debug_ter_mux = {
 static struct mux_clk kpss_debug_sec_mux = {
 	.offset = GLB_CLK_DIAG,
 	.en_offset = L2_CBCR_REG,
+	.en_reg = 1,
 	.ops = &mux_reg_ops,
 	.en_mask = BIT(0),
 	.mask = 0x7,
