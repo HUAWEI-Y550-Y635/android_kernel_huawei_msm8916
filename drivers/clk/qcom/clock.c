@@ -42,7 +42,6 @@ struct handoff_vdd {
 static LIST_HEAD(handoff_vdd_list);
 
 static DEFINE_MUTEX(msm_clock_init_lock);
-static LIST_HEAD(orphan_clk_list);
 
 /* Find the voltage level required for a given rate. */
 int find_vdd_level(struct clk *clk, unsigned long rate)
@@ -705,9 +704,6 @@ static int __handoff_clk(struct clk *clk)
 	if (clk->flags & CLKFLAG_INIT_ERR)
 		return -ENXIO;
 
-	if (clk->flags & CLKFLAG_EPROBE_DEFER)
-		return -EPROBE_DEFER;
-
 	/* Handoff any 'depends' clock first. */
 	rc = __handoff_clk(clk->depends);
 	if (rc)
@@ -768,9 +764,6 @@ static int __handoff_clk(struct clk *clk)
 	}
 
 	clk->flags |= CLKFLAG_INIT_DONE;
-	/* if the clk is on orphan list, remove it */
-	list_del_init(&clk->list);
-	clock_debug_register(clk);
 
 	return 0;
 
@@ -778,14 +771,8 @@ err_depends:
 	clk_disable_unprepare(clk->parent);
 err:
 	kfree(h);
-	if (rc == -EPROBE_DEFER) {
-		clk->flags |= CLKFLAG_EPROBE_DEFER;
-		if (list_empty(&clk->list))
-			list_add_tail(&clk->list, &orphan_clk_list);
-	} else {
-		pr_err("%s handoff failed (%d)\n", clk->dbg_name, rc);
-		clk->flags |= CLKFLAG_INIT_ERR;
-	}
+	clk->flags |= CLKFLAG_INIT_ERR;
+	pr_err("%s handoff failed (%d)\n", clk->dbg_name, rc);
 	return rc;
 }
 
@@ -799,9 +786,7 @@ err:
  */
 int msm_clock_register(struct clk_lookup *table, size_t size)
 {
-	int n = 0, rc;
-	struct clk *c, *safe;
-	bool found_more_clks;
+	int n = 0;
 
 	mutex_lock(&msm_clock_init_lock);
 
@@ -821,26 +806,12 @@ int msm_clock_register(struct clk_lookup *table, size_t size)
 	 * Detect and preserve initial clock state until clock_late_init() or
 	 * a driver explicitly changes it, whichever is first.
 	 */
-
-	for (n = 0; n < size; n++)
+	for (n = 0; n < size; n++) {
 		__handoff_clk(table[n].clk);
+		clock_debug_register(table[n].clk);
+	}
 
-	/* maintain backwards compatibility */
-	if (table[0].con_id || table[0].dev_id)
-		clkdev_add_table(table, size);
-
-	do {
-		found_more_clks = false;
-		/* clear cached __handoff_clk return values */
-		list_for_each_entry_safe(c, safe, &orphan_clk_list, list)
-			c->flags &= ~CLKFLAG_EPROBE_DEFER;
-
-		list_for_each_entry_safe(c, safe, &orphan_clk_list, list) {
-			rc = __handoff_clk(c);
-			if (!rc)
-				found_more_clks = true;
-		}
-	} while (found_more_clks);
+	clkdev_add_table(table, size);
 
 	mutex_unlock(&msm_clock_init_lock);
 
