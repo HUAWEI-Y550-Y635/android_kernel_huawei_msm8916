@@ -68,11 +68,11 @@ struct pll_config_masks {
  */
 struct pll_vote_clk {
 	u32 *soft_vote;
-	u32 soft_vote_mask;
+	const u32 soft_vote_mask;
 	void __iomem *const en_reg;
-	u32 en_mask;
+	const u32 en_mask;
 	void __iomem *const status_reg;
-	u32 status_mask;
+	const u32 status_mask;
 
 	struct clk c;
 	void *const __iomem *base;
