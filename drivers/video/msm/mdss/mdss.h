@@ -67,6 +67,7 @@ struct mdss_max_bw_settings {
 
 struct mdss_debug_inf {
 	void *debug_data;
+	int (*debug_dump_stats)(void *data, char *buf, int len);
 	void (*debug_enable_clock)(int on);
 };
 
