@@ -70,10 +70,19 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 	mdp5_data = mfd_to_mdp5_data(pstatus_data->mfd);
 	ctl = mfd_to_ctl(pstatus_data->mfd);
 
-	if (!ctl) {
-		pr_err("%s: Display is off\n", __func__);
+	if (ctl->shared_lock)
+		mutex_lock(ctl->shared_lock);
+	mutex_lock(&mdp5_data->ov_lock);
+
+	if (pstatus_data->mfd->shutdown_pending) {
+		mutex_unlock(&mdp5_data->ov_lock);
+		if (ctl->shared_lock)
+			mutex_unlock(ctl->shared_lock);
+		pr_err("%s: DSI turning off, avoiding BTA status check\n",
+							__func__);
 		return;
 	}
+
 
 	/*
 	 * TODO: Because mdss_dsi_cmd_mdp_busy has made sure DMA to
@@ -115,6 +124,8 @@ void mdss_check_dsi_ctrl_status(struct work_struct *work, uint32_t interval)
 
 	if (mipi->mode == DSI_CMD_MODE)
 		mutex_unlock(&mdp5_data->ov_lock);
+	if (ctl->shared_lock)
+		mutex_unlock(ctl->shared_lock);
 
 	if ((pstatus_data->mfd->panel_power_on)) {
 		if (ret > 0) {
