@@ -6,7 +6,7 @@
  and the other groups need to do some modify with DTSxxx.
 */
 /*belong to the component group, according to the order of i2c lcd tp camera sensors compass tricolors vibrator begin*/
-#include "huawei-i2c-detect-va.dtsi"
+/*#include "huawei-i2c-detect-va.dtsi"*/
 #include "huawei-lcd.dtsi"
 #include "huawei-tp.dtsi"
 

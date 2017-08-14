@@ -21,6 +21,8 @@ Required properties:
 	7: 1st pin is right top (from top view)
 	8: 1st pin is right down (from top view)
  - akm,gpio_rstn	: The gpio pin to reset the sensor chip.
+ - akm,use-hrtimer	: Enable the hrtimer mode. The hrtimer will be used as the poling
+	 delay timer, and high priority workqueue will be used in order to get a more stable polling interval.
 
 Optional properites:
 
