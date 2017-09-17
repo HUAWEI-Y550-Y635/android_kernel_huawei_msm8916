@@ -17,7 +17,6 @@
 #define MAX_PLANES_PER_STREAM 3
 #define MAX_NUM_STREAM 7
 
-#define ISP_VERSION_46        46
 #define ISP_VERSION_44        44
 #define ISP_VERSION_40        40
 #define ISP_VERSION_32        32
@@ -62,7 +61,6 @@ enum msm_vfe_input_src {
 enum msm_vfe_axi_stream_src {
 	PIX_ENCODER,
 	PIX_VIEWFINDER,
-	PIX_VIDEO,
 	CAMIF_RAW,
 	IDEAL_RAW,
 	RDI_INTF_0,
@@ -221,8 +219,6 @@ enum msm_isp_stats_type {
 	MSM_ISP_STATS_BE,    /* Bayer Exposure*/
 	MSM_ISP_STATS_BHIST, /* Bayer Hist */
 	MSM_ISP_STATS_BF_SCALE, /* Bayer Focus scale */
-	MSM_ISP_STATS_HDR_BE, /* HDR Bayer Exposure */
-	MSM_ISP_STATS_HDR_BHIST, /* HDR Bayer Hist */
 	MSM_ISP_STATS_MAX    /* MAX */
 };
 
