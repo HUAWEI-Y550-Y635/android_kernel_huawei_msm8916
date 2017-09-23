@@ -8157,7 +8157,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] =
         .flags = WIPHY_VENDOR_CMD_NEED_WDEV |
             WIPHY_VENDOR_CMD_NEED_NETDEV |
             WIPHY_VENDOR_CMD_NEED_RUNNING,
-        .doit = hdd_cfg80211_get_station_cmd
+        .doit = (void *)hdd_cfg80211_get_station_cmd
     },
 };
 
