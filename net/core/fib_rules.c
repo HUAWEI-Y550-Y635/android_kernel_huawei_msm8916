@@ -185,28 +185,6 @@ void fib_rules_unregister(struct fib_rules_ops *ops)
 }
 EXPORT_SYMBOL_GPL(fib_rules_unregister);
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-static inline kuid_t fib_nl_uid(struct nlattr *nla)
-{
-	return make_kuid(current_user_ns(), nla_get_u32(nla));
-}
-
-static int nla_put_uid(struct sk_buff *skb, int idx, kuid_t uid)
-{
-	return nla_put_u32(skb, idx, from_kuid_munged(current_user_ns(), uid));
-}
-
-static int fib_uid_range_match(struct flowi *fl, struct fib_rule *rule)
-{
-	return (!uid_valid(rule->uid_start) && !uid_valid(rule->uid_end)) ||
-	       (uid_gte(fl->flowi_uid, rule->uid_start) &&
-		uid_lte(fl->flowi_uid, rule->uid_end));
-}
-
-=======
->>>>>>> 032f795... Revert "net: core: Support UID-based routing."
-=======
 static int uid_range_set(struct fib_kuid_range *range)
 {
 	return uid_valid(range->start) && uid_valid(range->end);
@@ -235,7 +213,6 @@ static int nla_put_uid_range(struct sk_buff *skb, struct fib_kuid_range *range)
 	return nla_put(skb, FRA_UID_RANGE, sizeof(out), &out);
 }
 
->>>>>>> b3bdc97... net: core: add UID to flows, rules, and routes
 static int fib_rule_match(struct fib_rule *rule, struct fib_rules_ops *ops,
 			  struct flowi *fl, int flags)
 {
@@ -671,15 +648,8 @@ static int fib_nl_fill_rule(struct sk_buff *skb, struct fib_rule *rule,
 	     nla_put_u32(skb, FRA_FWMASK, rule->mark_mask)) ||
 	    (rule->target &&
 	     nla_put_u32(skb, FRA_GOTO, rule->target)) ||
-<<<<<<< HEAD
-	    (uid_valid(rule->uid_start) &&
-	     nla_put_uid(skb, FRA_UID_START, rule->uid_start)) ||
-	    (uid_valid(rule->uid_end) &&
-	     nla_put_uid(skb, FRA_UID_END, rule->uid_end)))
-=======
 	    (uid_range_set(&rule->uid_range) &&
 	     nla_put_uid_range(skb, &rule->uid_range)))
->>>>>>> b3bdc97... net: core: add UID to flows, rules, and routes
 		goto nla_put_failure;
 	if (ops->fill(rule, skb, frh) < 0)
 		goto nla_put_failure;
