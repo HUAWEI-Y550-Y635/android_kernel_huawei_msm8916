@@ -3195,6 +3195,9 @@ static void qpnp_vm_bms_ext_power_changed(struct power_supply *psy)
 	}
 #else
 	battery_insertion_check(chip);
+	/* Re-schedule monitor_soc_work */
+	cancel_delayed_work_sync(&chip->monitor_soc_work);
+	schedule_delayed_work(&chip->monitor_soc_work, 0);
 #endif
 #ifdef CONFIG_HUAWEI_KERNEL
 	present = is_charger_present(chip);
