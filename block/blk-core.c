@@ -38,16 +38,6 @@
 #include "blk.h"
 #include "blk-cgroup.h"
 
-#ifdef CONFIG_HW_SYSTEM_WR_PROTECT
-#ifdef CONFIG_HW_FEATURE_STORAGE_DIAGNOSE_LOG
-#include <linux/store_log.h>
-
-#endif
-
-#ifdef CONFIG_HUAWEI_DSM
-#include <linux/mmc/dsm_emmc.h>
-#endif
-#endif
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_remap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_rq_remap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_complete);
@@ -64,13 +54,6 @@ static struct kmem_cache *request_cachep;
  * For queue allocation
  */
 struct kmem_cache *blk_requestq_cachep;
-
-#ifdef CONFIG_HW_SYSTEM_WR_PROTECT
-/* system write protect flag, 0: disable(default) 1:enable */
-static volatile int *ro_secure_debuggable = NULL;
-/* system partition number is platform dependent, MUST change it according to platform */
-#define PART_SYSTEM "mmcblk0p23"
-#endif
 
 /*
  * Controlling structure to kblockd
@@ -1958,15 +1941,6 @@ void generic_make_request(struct bio *bio)
 }
 EXPORT_SYMBOL(generic_make_request);
 
-#ifdef CONFIG_HW_SYSTEM_WR_PROTECT
-int blk_set_ro_secure_debuggable(int state)
-{
-    *ro_secure_debuggable = state;
-    return 0;
-}
-EXPORT_SYMBOL(blk_set_ro_secure_debuggable);
-#endif
-
 /**
  * submit_bio - submit a bio to the block device layer for I/O
  * @rw: whether to %READ or %WRITE, or maybe to %READA (read ahead)
@@ -1979,9 +1953,6 @@ EXPORT_SYMBOL(blk_set_ro_secure_debuggable);
  */
 void submit_bio(int rw, struct bio *bio)
 {
-#ifdef CONFIG_HW_SYSTEM_WR_PROTECT
-    char devname[BDEVNAME_SIZE] = {0};
-#endif
 	struct task_struct *tsk = current;
 	bio->bi_rw |= rw;
 
@@ -2003,52 +1974,6 @@ void submit_bio(int rw, struct bio *bio)
 			task_io_account_read(bio->bi_size);
 			count_vm_events(PGPGIN, count);
 		}
-
-#ifdef CONFIG_HW_SYSTEM_WR_PROTECT
-        if(rw & WRITE)
-        {
-            memset(devname, 0x00, BDEVNAME_SIZE);
-            bdevname(bio->bi_bdev, devname);
-
-            /*
-             * runmode=factory:send write request to mmc driver.
-             * bootmode=recovery:send write request to mmc driver.
-             * partition is mounted ro: file system will block write request.
-             * root user: send write request to mmc driver.
-             */
-            if((strstr(devname,PART_SYSTEM)!=NULL) &&
-                    *ro_secure_debuggable)
-            {
-#ifdef CONFIG_HUAWEI_DSM
-				DSM_EMMC_LOG(NULL, DSM_SYSTEM_W_ERR,
-					"%s(%d)[Parent: %s(%d)]: %s block %Lu on %s (%u sectors) %d %s.\n",
-					current->comm, task_pid_nr(current),current->parent->comm,task_pid_nr(current->parent),
-					(rw & WRITE) ? "WRITE" : "READ",
-					(unsigned long long)bio->bi_sector,
-					devname,
-					count,
-					*ro_secure_debuggable,
-					(strstr(saved_command_line,"androidboot.widvine_state=locked") != NULL) ? "locked" : "unlock");
-#else
-                printk(KERN_DEBUG "[HW]:EXT4_ERR_CAPS:%s(%d)[Parent: %s(%d)]: %s block %Lu on %s (%u sectors) %d %s.\n",
-                        current->comm, task_pid_nr(current), current->parent->comm,task_pid_nr(current->parent),
-                        (rw & WRITE) ? "WRITE" : "READ",
-                        (unsigned long long)bio->bi_sector,
-                        devname,
-                        count,
-                        *ro_secure_debuggable,
-                        (strstr(saved_command_line,"androidboot.widvine_state=locked") != NULL) ? "locked" : "unlock");
-
-#endif
-
-#ifdef CONFIG_HW_SYSTEM_WR_PROTECT_ENABLE
-            	bio_endio(bio, -EIO);
-                return;
-#endif
-            }
-        }
-#endif
-
         
 		if (unlikely(block_dump)) {
 			char b[BDEVNAME_SIZE];
@@ -3408,18 +3333,3 @@ int __init blk_dev_init(void)
 
 	return 0;
 }
-
-#ifdef CONFIG_HW_SYSTEM_WR_PROTECT
-int __init ro_secure_debuggable_init(void)
-{
-    static int ro_secure_debuggable_static = 0;
-
-    ro_secure_debuggable = kzalloc(sizeof(int), GFP_KERNEL);
-    if (!ro_secure_debuggable)
-        ro_secure_debuggable = &ro_secure_debuggable_static;
-
-    return 0;
-}
-late_initcall(ro_secure_debuggable_init);
-#endif
-
