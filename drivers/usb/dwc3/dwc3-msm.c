@@ -1123,7 +1123,7 @@ static void dwc3_msm_notify_event(struct dwc3 *dwc, unsigned event)
 	case DWC3_CONTROLLER_ERROR_EVENT:
 		dev_info(mdwc->dev, "DWC3_CONTROLLER_ERROR_EVENT received\n");
 		dwc3_msm_dump_phy_info(mdwc);
-		dwc3_msm_write_reg(mdwc->base, DWC3_DEVTEN, 0);
+		dwc3_gadget_disable_irq(dwc);
 		/*
 		 * schedule work for doing block reset for recovery from erratic
 		 * error event.
@@ -1211,30 +1211,16 @@ static void dwc3_block_reset_usb_work(struct work_struct *w)
 {
 	struct dwc3_msm *mdwc = container_of(w, struct dwc3_msm,
 						usb_block_reset_work);
-	u32 reg;
+	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+	unsigned long flags;
 
 	dev_dbg(mdwc->dev, "%s\n", __func__);
 
 	dwc3_msm_block_reset(&mdwc->ext_xceiv, true);
-
-	reg = (DWC3_DEVTEN_EVNTOVERFLOWEN |
-			DWC3_DEVTEN_CMDCMPLTEN |
-			DWC3_DEVTEN_ERRTICERREN |
-			DWC3_DEVTEN_WKUPEVTEN |
-			DWC3_DEVTEN_CONNECTDONEEN |
-			DWC3_DEVTEN_USBRSTEN |
-			DWC3_DEVTEN_DISCONNEVTEN);
-	/*
-	 * Enable SUSPENDEVENT(BIT:6) for version 230A and above
-	 * else enable USB Link change event (BIT:3) for older version
-	 */
-	if (dwc3_msm_read_reg(mdwc->base, DWC3_GSNPSID) < DWC3_REVISION_230A)
-		reg |= DWC3_DEVTEN_ULSTCNGEN;
-	else
-		reg |= DWC3_DEVTEN_SUSPEND;
-
-	dwc3_msm_write_reg(mdwc->base, DWC3_DEVTEN, reg);
-
+	dwc3_gadget_enable_irq(dwc);
+	spin_lock_irqsave(&dwc->lock, flags);
+	dwc->err_evt_seen = 0;
+	spin_unlock_irqrestore(&dwc->lock, flags);
 }
 
 static void dwc3_chg_enable_secondary_det(struct dwc3_msm *mdwc)
@@ -1593,6 +1579,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	bool host_ss_active;
 	bool can_suspend_ssphy;
 	bool device_bus_suspend;
+	bool cable_connected = mdwc->vbus_active;
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
 
 	dev_dbg(mdwc->dev, "%s: entering lpm. usb_lpm_override:%d\n",
@@ -1631,7 +1618,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 		return -EBUSY;
 	}
 
-	if (!mdwc->vbus_active && mdwc->otg_xceiv &&
+	if (!cable_connected && mdwc->otg_xceiv &&
 		mdwc->otg_xceiv->state == OTG_STATE_B_PERIPHERAL) {
 		/*
 		 * In some cases, the pm_runtime_suspend may be called by
@@ -1676,7 +1663,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	device_bus_suspend = ((mdwc->charger.chg_type == DWC3_SDP_CHARGER) ||
 				 (mdwc->charger.chg_type == DWC3_CDP_CHARGER));
 
-	if (host_bus_suspend || device_bus_suspend) {
+	if (host_bus_suspend || (dwc->softconnect && cable_connected)) {
 		ret = dwc3_msm_prepare_suspend(mdwc);
 		if (ret)
 			return ret;
@@ -1713,7 +1700,7 @@ static int dwc3_msm_suspend(struct dwc3_msm *mdwc)
 	mdwc->gctl_val = dwc3_msm_read_reg(mdwc->base, DWC3_GCTL);
 
 	/* Perform controller power collapse */
-	if (!host_bus_suspend && !device_bus_suspend && mdwc->power_collapse) {
+	if (!host_bus_suspend && mdwc->power_collapse && !cable_connected) {
 		mdwc->lpm_flags |= MDWC3_POWER_COLLAPSE;
 		dev_dbg(mdwc->dev, "%s: power collapse\n", __func__);
 		dwc3_msm_config_gdsc(mdwc, 0);
@@ -2223,8 +2210,12 @@ static int dwc3_msm_power_set_property_usb(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_USB_OTG:
 		/* Let OTG know about ID detection */
 		mdwc->id_state = val->intval ? DWC3_ID_GROUND : DWC3_ID_FLOAT;
-		if (mdwc->otg_xceiv && mdwc->ext_xceiv.otg_capability)
-			queue_work(system_nrt_wq, &mdwc->id_work);
+		if (mdwc->otg_xceiv && !mdwc->ext_inuse &&
+		    (mdwc->ext_xceiv.otg_capability)) {
+			mdwc->ext_xceiv.id = mdwc->id_state;
+			queue_delayed_work(system_nrt_wq,
+							&mdwc->resume_work, 12);
+		}
 
 		break;
 	case POWER_SUPPLY_PROP_SCOPE:
@@ -3179,8 +3170,6 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	}
 
 	dwc = platform_get_drvdata(mdwc->dwc3);
-	dwc->vbus_active = of_property_read_bool(node, "qcom,vbus-present");
-
 	if (dwc && dwc->dotg)
 		mdwc->otg_xceiv = dwc->dotg->otg.phy;
 	/* Register with OTG if present */
@@ -3253,6 +3242,8 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 
 put_dwc3:
 	platform_device_put(mdwc->dwc3);
+	if (mdwc->bus_perf_client)
+		msm_bus_scale_unregister_client(mdwc->bus_perf_client);
 disable_vbus:
 	if (!IS_ERR_OR_NULL(mdwc->vbus_otg))
 		regulator_disable(mdwc->vbus_otg);
@@ -3335,6 +3326,9 @@ static int dwc3_msm_remove(struct platform_device *pdev)
 	pm_runtime_put_sync(mdwc->dev);
 	pm_runtime_set_suspended(mdwc->dev);
 	device_wakeup_disable(mdwc->dev);
+
+	if (mdwc->bus_perf_client)
+		msm_bus_scale_unregister_client(mdwc->bus_perf_client);
 
 	if (!IS_ERR_OR_NULL(mdwc->vbus_otg))
 		regulator_disable(mdwc->vbus_otg);
