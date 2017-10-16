@@ -259,7 +259,6 @@
 			label = "blue";
 			linux,default-trigger = "none";
 			default-state = "off";
-			retain-state-suspended;
 		};
 	};
 

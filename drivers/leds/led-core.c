@@ -4,7 +4,6 @@
  * Copyright 2005-2006 Openedhand Ltd.
  *
  * Author: Richard Purdie <rpurdie@openedhand.com>
- * Copyright (C) 2016 @surdu_petru
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,8 +36,8 @@ static void led_set_software_blink(struct led_classdev *led_cdev,
 	if (!led_cdev->blink_brightness)
 		led_cdev->blink_brightness = led_cdev->max_brightness;
 
-	led_cdev->blink_delay_on = 1000; //delay_on;
-	led_cdev->blink_delay_off = 1000; //delay_off;
+	led_cdev->blink_delay_on = delay_on;
+	led_cdev->blink_delay_off = delay_off;
 
 	/* never on - don't blink */
 	if (!delay_on)
@@ -65,7 +64,7 @@ static void led_blink_setup(struct led_classdev *led_cdev,
 
 	/* blink with 1 Hz as default if nothing specified */
 	if (!*delay_on && !*delay_off)
-		*delay_on = *delay_off = 1000; //500;
+		*delay_on = *delay_off = 500;
 
 	led_set_software_blink(led_cdev, *delay_on, *delay_off);
 }
