@@ -1429,6 +1429,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		if (ret != 0)
 			return ret;
 
+		case ASM_SESSION_CMD_SET_MTMX_STRTR_PARAMS_V2:
 		case ASM_STREAM_CMD_OPEN_READ_V3:
 		case ASM_STREAM_CMD_OPEN_WRITE_V3:
 		case ASM_STREAM_CMD_OPEN_READWRITE_V2:
