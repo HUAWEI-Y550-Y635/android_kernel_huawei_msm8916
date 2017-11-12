@@ -17,10 +17,11 @@
 #include <linux/delay.h>
 #include <linux/workqueue.h>
 #include <linux/kmod.h>
+#include <linux/wakeup_reason.h>
+#include <linux/cpuset.h>
 #ifdef CONFIG_HUAWEI_KERNEL
 extern int suspend_sys_sync_wait(void);
 #endif
-#include <linux/wakeup_reason.h>
 
 /* 
  * Timeout for stopping processes
@@ -241,6 +242,8 @@ void thaw_processes(void)
 
 	__usermodehelper_set_disable_depth(UMH_FREEZING);
 	thaw_workqueues();
+
+	cpuset_wait_for_hotplug();
 
 	read_lock(&tasklist_lock);
 	do_each_thread(g, p) {
