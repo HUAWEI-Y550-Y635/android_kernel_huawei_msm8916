@@ -25,7 +25,6 @@
 
 #include "diagchar.h"
 #include "diagmem.h"
-#include "diagfwd_bridge.h"
 
 struct diag_mempool_t diag_mempools[NUM_MEMORY_POOLS] = {
 	{
@@ -53,8 +52,8 @@ struct diag_mempool_t diag_mempools[NUM_MEMORY_POOLS] = {
 		.count = 0
 	},
 	{
-		.id = POOL_TYPE_USB_APPS,
-		.name = "POOL_USB_APPS",
+		.id = POOL_TYPE_MUX_APPS,
+		.name = "POOL_MUX_APPS",
 		.pool = NULL,
 		.itemsize = 0,
 		.poolsize = 0,
@@ -102,16 +101,16 @@ struct diag_mempool_t diag_mempools[NUM_MEMORY_POOLS] = {
 		.count = 0
 	},
 	{
-		.id = POOL_TYPE_MDM_USB,
-		.name = "POOL_MDM_USB",
+		.id = POOL_TYPE_MDM_MUX,
+		.name = "POOL_MDM_MUX",
 		.pool = NULL,
 		.itemsize = 0,
 		.poolsize = 0,
 		.count = 0
 	},
 	{
-		.id = POOL_TYPE_MDM2_USB,
-		.name = "POOL_MDM2_USB",
+		.id = POOL_TYPE_MDM2_MUX,
+		.name = "POOL_MDM2_MUX",
 		.pool = NULL,
 		.itemsize = 0,
 		.poolsize = 0,
@@ -128,6 +127,14 @@ struct diag_mempool_t diag_mempools[NUM_MEMORY_POOLS] = {
 	{
 		.id = POOL_TYPE_MDM2_DCI_WRITE,
 		.name = "POOL_MDM2_DCI_WRITE",
+		.pool = NULL,
+		.itemsize = 0,
+		.poolsize = 0,
+		.count = 0
+	},
+	{
+		.id = POOL_TYPE_QSC_MUX,
+		.name = "POOL_QSC_MUX",
 		.pool = NULL,
 		.itemsize = 0,
 		.poolsize = 0,
@@ -254,6 +261,9 @@ void diagmem_init(struct diagchar_dev *driver, int index)
 						    mempool->itemsize);
 	if (!mempool->pool)
 		pr_err("diag: cannot allocate %s mempool\n", mempool->name);
+	else
+		kmemleak_not_leak(mempool->pool);
+
 	spin_lock_init(&mempool->lock);
 }
 
