@@ -44,6 +44,10 @@
 #define TAPAN_IS_1_0(ver) \
 	((ver == TAPAN_VERSION_1_0) ? 1 : 0)
 
+#define TOMTOM_VERSION_1_0	1
+#define TOMTOM_IS_1_0(ver) \
+	((ver == TOMTOM_VERSION_1_0) ? 1 : 0)
+
 #define TOMBAK_VERSION_1_0	0
 #define TOMBAK_IS_1_0(ver) \
 	((ver == TOMBAK_VERSION_1_0) ? 1 : 0)
